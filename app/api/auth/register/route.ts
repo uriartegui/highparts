@@ -11,16 +11,16 @@ export async function POST(request: Request) {
     return Response.json({ error: "Informe nome, e-mail válido e senha com pelo menos 8 caracteres." }, { status: 400 });
   }
   if (password !== input.confirmPassword) {
-    return Response.json({ error: "As senhas não coincidem." }, { status: 400 });
+    return Response.json({ field: "confirmPassword", error: "As senhas não coincidem." }, { status: 400 });
   }
   if (!/^\d{11}$/.test(phone)) {
-    return Response.json({ error: "Informe um celular válido com DDD." }, { status: 400 });
+    return Response.json({ field: "phone", error: "Informe um celular válido com DDD." }, { status: 400 });
   }
   if (await env.DB.prepare("SELECT id FROM users WHERE email=?").bind(email).first()) {
-    return Response.json({ error: "Este e-mail já possui uma conta." }, { status: 409 });
+    return Response.json({ field: "email", error: "Este e-mail já possui uma conta." }, { status: 409 });
   }
   if (await env.DB.prepare("SELECT id FROM users WHERE phone=?").bind(phone).first()) {
-    return Response.json({ error: "Este telefone já possui uma conta." }, { status: 409 });
+    return Response.json({ field: "phone", error: "Este telefone já possui uma conta." }, { status: 409 });
   }
   const id = crypto.randomUUID();
   const role = email === ADMIN_EMAIL ? "admin" : "customer";
@@ -28,7 +28,10 @@ export async function POST(request: Request) {
     await env.DB.prepare("INSERT INTO users (id,name,email,password_hash,role,phone) VALUES (?,?,?,?,?,?)")
       .bind(id, name, email, await hashPassword(password), role, phone).run();
   } catch {
-    return Response.json({ error: "E-mail ou telefone já cadastrado." }, { status: 409 });
+    const duplicateEmail = await env.DB.prepare("SELECT id FROM users WHERE email=?").bind(email).first();
+    return Response.json(duplicateEmail
+      ? { field: "email", error: "Este e-mail já possui uma conta." }
+      : { field: "phone", error: "Este telefone já possui uma conta." }, { status: 409 });
   }
   await createSession(id);
   return Response.json({ user: { id, name, email, role } }, { status: 201 });
