@@ -7,20 +7,21 @@ export async function POST(request: Request) {
   const email = input.email?.trim().toLowerCase() ?? "";
   const password = input.password ?? "";
   const phone = (input.phone ?? "").replace(/\D/g, "");
-  if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8) {
-    return Response.json({ error: "Informe nome, e-mail válido e senha com pelo menos 8 caracteres." }, { status: 400 });
-  }
-  if (password !== input.confirmPassword) {
-    return Response.json({ field: "confirmPassword", error: "As senhas não coincidem." }, { status: 400 });
-  }
-  if (!/^\d{11}$/.test(phone)) {
-    return Response.json({ field: "phone", error: "Informe um celular válido com DDD." }, { status: 400 });
-  }
-  if (await env.DB.prepare("SELECT id FROM users WHERE email=?").bind(email).first()) {
-    return Response.json({ field: "email", error: "Este e-mail já possui uma conta." }, { status: 409 });
-  }
-  if (await env.DB.prepare("SELECT id FROM users WHERE phone=?").bind(phone).first()) {
-    return Response.json({ field: "phone", error: "Este telefone já possui uma conta." }, { status: 409 });
+  const fieldErrors: Record<string, string> = {};
+  if (name.length < 2) fieldErrors.name = "Informe seu nome completo.";
+  if (!/^\S+@\S+\.\S+$/.test(email)) fieldErrors.email = "Informe um e-mail válido.";
+  if (!/^\d{11}$/.test(phone)) fieldErrors.phone = "Informe um celular válido com DDD.";
+  if (password.length < 8) fieldErrors.password = "A senha deve ter pelo menos 8 caracteres.";
+  if (password !== (input.confirmPassword ?? "")) fieldErrors.confirmPassword = "As senhas não coincidem.";
+
+  const [emailOwner, phoneOwner] = await Promise.all([
+    email && !fieldErrors.email ? env.DB.prepare("SELECT id FROM users WHERE email=?").bind(email).first() : null,
+    phone && !fieldErrors.phone ? env.DB.prepare("SELECT id FROM users WHERE phone=?").bind(phone).first() : null,
+  ]);
+  if (emailOwner) fieldErrors.email = "Este e-mail já possui uma conta.";
+  if (phoneOwner) fieldErrors.phone = "Este telefone já possui uma conta.";
+  if (Object.keys(fieldErrors).length) {
+    return Response.json({ fieldErrors }, { status: emailOwner || phoneOwner ? 409 : 400 });
   }
   const id = crypto.randomUUID();
   const role = email === ADMIN_EMAIL ? "admin" : "customer";
@@ -29,9 +30,9 @@ export async function POST(request: Request) {
       .bind(id, name, email, await hashPassword(password), role, phone).run();
   } catch {
     const duplicateEmail = await env.DB.prepare("SELECT id FROM users WHERE email=?").bind(email).first();
-    return Response.json(duplicateEmail
-      ? { field: "email", error: "Este e-mail já possui uma conta." }
-      : { field: "phone", error: "Este telefone já possui uma conta." }, { status: 409 });
+    return Response.json({ fieldErrors: duplicateEmail
+      ? { email: "Este e-mail já possui uma conta." }
+      : { phone: "Este telefone já possui uma conta." } }, { status: 409 });
   }
   await createSession(id);
   return Response.json({ user: { id, name, email, role } }, { status: 201 });

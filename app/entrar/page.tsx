@@ -27,13 +27,11 @@ export default function LoginPage() {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoading(true); setError(""); setFieldErrors({});
     const data = Object.fromEntries(new FormData(event.currentTarget));
-    if (mode === "register" && data.password !== data.confirmPassword) {
-      setFieldErrors({ confirmPassword: "As senhas não coincidem." }); setLoading(false); return;
-    }
     const response = await fetch(`/api/auth/${mode === "login" ? "login" : "register"}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
     const result = await response.json();
     if (!response.ok) {
-      if (result.field) setFieldErrors({ [result.field]: result.error });
+      if (result.fieldErrors) setFieldErrors(result.fieldErrors);
+      else if (result.field) setFieldErrors({ [result.field]: result.error });
       else setError(result.error ?? "Não foi possível continuar.");
       setLoading(false); return;
     }
@@ -44,10 +42,10 @@ export default function LoginPage() {
   return <main className="auth-page"><a href="/"><img src="/highparts-logo.png" alt="HighParts" /></a><section>
     <div className="auth-heading"><small>CONTA HIGHPARTS</small><h1>{mode === "login" ? "Bem-vindo de volta." : "Crie sua conta."}</h1><p>Carrinho, veículos e pedidos ficam salvos com segurança.</p></div>
     <div className="auth-tabs"><button className={mode === "login" ? "active" : ""} onClick={() => changeMode("login")}>Entrar</button><button className={mode === "register" ? "active" : ""} onClick={() => changeMode("register")}>Criar conta</button></div>
-    <form onSubmit={submit}>
-      {mode === "register" && <><label>Nome completo<input name="name" required minLength={2} autoComplete="name" /></label><label className={fieldErrors.phone ? "field-invalid" : ""}>Telefone<input name="phone" type="tel" inputMode="numeric" placeholder="(00) 00000-0000" required maxLength={15} autoComplete="tel" aria-invalid={!!fieldErrors.phone} onChange={event => { event.currentTarget.value = formatPhone(event.currentTarget.value); setFieldErrors(current => ({ ...current, phone: "" })); }} />{fieldErrors.phone && <small className="field-error">{fieldErrors.phone}</small>}</label></>}
+    <form onSubmit={submit} noValidate>
+      {mode === "register" && <><label className={fieldErrors.name ? "field-invalid" : ""}>Nome completo<input name="name" minLength={2} autoComplete="name" aria-invalid={!!fieldErrors.name} onChange={() => setFieldErrors(current => ({ ...current, name: "" }))} />{fieldErrors.name && <small className="field-error">{fieldErrors.name}</small>}</label><label className={fieldErrors.phone ? "field-invalid" : ""}>Telefone<input name="phone" type="tel" inputMode="numeric" placeholder="(00) 00000-0000" maxLength={15} autoComplete="tel" aria-invalid={!!fieldErrors.phone} onChange={event => { event.currentTarget.value = formatPhone(event.currentTarget.value); setFieldErrors(current => ({ ...current, phone: "" })); }} />{fieldErrors.phone && <small className="field-error">{fieldErrors.phone}</small>}</label></>}
       <label className={fieldErrors.email ? "field-invalid" : ""}>E-mail<input name="email" type="email" required autoComplete="email" aria-invalid={!!fieldErrors.email} onChange={() => setFieldErrors(current => ({ ...current, email: "" }))} />{fieldErrors.email && <small className="field-error">{fieldErrors.email}</small>}</label>
-      <label>Senha<span className="password-field"><input name="password" type={showPassword ? "text" : "password"} required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button></span></label>
+      <label className={fieldErrors.password ? "field-invalid" : ""}>Senha<span className="password-field"><input name="password" type={showPassword ? "text" : "password"} minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!fieldErrors.password} onChange={() => setFieldErrors(current => ({ ...current, password: "" }))} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button></span>{fieldErrors.password && <small className="field-error">{fieldErrors.password}</small>}</label>
       {mode === "register" && <label className={fieldErrors.confirmPassword ? "field-invalid" : ""}>Confirmar senha<span className="password-field"><input name="confirmPassword" type={showConfirmation ? "text" : "password"} required minLength={8} autoComplete="new-password" aria-invalid={!!fieldErrors.confirmPassword} onChange={() => setFieldErrors(current => ({ ...current, confirmPassword: "" }))} /><button type="button" onClick={() => setShowConfirmation(!showConfirmation)} aria-label={showConfirmation ? "Ocultar confirmação de senha" : "Mostrar confirmação de senha"}>{showConfirmation ? <EyeOff /> : <Eye />}</button></span>{fieldErrors.confirmPassword && <small className="field-error">{fieldErrors.confirmPassword}</small>}</label>}
       {error && <p className="auth-error">{error}</p>}<button className="auth-submit" disabled={loading}>{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar minha conta"}</button>
     </form><div className="auth-secure"><ShieldCheck /><span><b>Sessão protegida</b><small>Senha criptografada e cookie seguro.</small></span></div>
