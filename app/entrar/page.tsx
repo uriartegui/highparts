@@ -36,7 +36,7 @@ export default function LoginPage() {
       setLoading(false); return;
     }
     const requested = params.get("returnTo");
-    window.location.href = requested?.startsWith("/") && !requested.startsWith("//") ? requested : result.user.role === "admin" ? "/admin" : "/conta";
+    window.location.href = requested?.startsWith("/") && !requested.startsWith("//") ? requested : "/";
   }
 
   return <main className="auth-page"><a href="/"><img src="/highparts-logo.png" alt="HighParts" /></a><section>
