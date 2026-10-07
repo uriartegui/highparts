@@ -23,3 +23,29 @@ export const orderItems = sqliteTable("order_items", {
   productCode: text("product_code").notNull().references(() => products.code), quantity: integer("quantity").notNull().default(1),
   unitPriceCents: integer("unit_price_cents").notNull().default(0),
 });
+
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(), name: text("name").notNull(), email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(), role: text("role").notNull().default("customer"),
+  phone: text("phone").notNull().default(""), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const sessions = sqliteTable("sessions", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id),
+  expiresAt: text("expires_at").notNull(), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const vehicles = sqliteTable("vehicles", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id),
+  plate: text("plate").notNull(), brand: text("brand").notNull().default(""), model: text("model").notNull().default(""),
+  year: text("year").notNull().default(""), version: text("version").notNull().default(""), hasAbs: integer("has_abs", { mode: "boolean" }),
+  nickname: text("nickname").notNull().default(""), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const savedCartItems = sqliteTable("saved_cart_items", {
+  id: text("id").primaryKey(), userId: text("user_id").notNull().references(() => users.id), itemKey: text("item_key").notNull(),
+  name: text("name").notNull(), fit: text("fit").notNull().default(""), priceCents: integer("price_cents").notNull(),
+  quantity: integer("quantity").notNull().default(1), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
