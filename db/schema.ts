@@ -27,7 +27,7 @@ export const orderItems = sqliteTable("order_items", {
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(), name: text("name").notNull(), email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(), role: text("role").notNull().default("customer"),
-  phone: text("phone").notNull().default(""), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  phone: text("phone").notNull().default("").unique(), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
