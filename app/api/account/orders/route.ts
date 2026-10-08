@@ -11,6 +11,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Entre na conta para finalizar a compra." }, { status: 401 });
+  if (!user.emailVerifiedAt) return Response.json({ error: "Confirme seu e-mail antes de finalizar a compra.", code: "EMAIL_NOT_VERIFIED" }, { status: 403 });
   const input = await request.json() as { phone?: string; postalCode?: string; address?: string; vehiclePlate?: string; items?: Array<{ itemKey: string; name: string; priceCents: number; quantity: number }> };
   const items = (input.items ?? []).filter((item) => item.quantity > 0 && item.priceCents >= 0);
   if (!items.length) return Response.json({ error: "O carrinho está vazio." }, { status: 400 });
