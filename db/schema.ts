@@ -8,6 +8,7 @@ export const products = sqliteTable("products", {
   priceCents: integer("price_cents"), stockQuantity: integer("stock_quantity"),
   active: integer("active", { mode: "boolean" }).notNull().default(true), imageUrl: text("image_url"),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  emailVerifiedAt: text("email_verified_at"),
 });
 
 export const orders = sqliteTable("orders", {
@@ -59,4 +60,15 @@ export const loginAttempts = sqliteTable("login_attempts", {
 export const passwordResetTokens = sqliteTable("password_reset_tokens", {
   tokenHash: text("token_hash").primaryKey(), userId: text("user_id").notNull().references(() => users.id),
   expiresAt: text("expires_at").notNull(), usedAt: text("used_at"), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const emailVerificationTokens = sqliteTable("email_verification_tokens", {
+  tokenHash: text("token_hash").primaryKey(), userId: text("user_id").notNull().references(() => users.id),
+  expiresAt: text("expires_at").notNull(), usedAt: text("used_at"), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const securityEvents = sqliteTable("security_events", {
+  id: text("id").primaryKey(), type: text("type").notNull(), userId: text("user_id"),
+  subjectHash: text("subject_hash"), details: text("details").notNull().default("{}"),
+  createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });

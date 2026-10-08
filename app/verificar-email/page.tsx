@@ -1,0 +1,5 @@
+"use client";
+import { useEffect,useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { CheckCircle2,LoaderCircle,XCircle } from "lucide-react";
+export default function VerifyEmailPage(){const token=useSearchParams().get("token");const [state,setState]=useState<"loading"|"ok"|"error">("loading");useEffect(()=>{if(!token){setState("error");return}fetch("/api/auth/verify-email",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token})}).then(r=>setState(r.ok?"ok":"error")).catch(()=>setState("error"))},[token]);return <main className="auth-page"><a href="/"><img src="/highparts-logo.png" alt="HighParts"/></a><section className="verify-card">{state==="loading"?<><LoaderCircle className="spin"/><h1>Confirmando seu e-mail…</h1></>:state==="ok"?<><CheckCircle2/><h1>E-mail confirmado.</h1><p>Sua conta está protegida e pronta para compras.</p><a href="/">Ir para a loja</a></>:<><XCircle/><h1>Link inválido ou expirado.</h1><p>Entre na conta para solicitar uma nova confirmação.</p><a href="/entrar">Entrar</a></>}</section></main>}

@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 const COOKIE_NAME = "highparts_session";
 const SESSION_DAYS = 30;
 
-export type AppUser = { id: string; name: string; email: string; role: "admin" | "customer"; phone: string };
+export type AppUser = { id: string; name: string; email: string; role: "admin" | "customer"; phone: string; emailVerifiedAt: string | null };
 
 function bytesToBase64(bytes: Uint8Array) {
   return btoa(String.fromCharCode(...bytes));
@@ -26,6 +26,28 @@ export async function hashToken(token: string) {
 export function isTrustedRequest(request: Request) {
   const origin = request.headers.get("origin");
   return !origin || origin === new URL(request.url).origin;
+}
+
+export async function verifyTurnstile(request: Request, token?: string) {
+  const securityEnv = env as unknown as { TURNSTILE_SECRET_KEY?: string };
+  if (!securityEnv.TURNSTILE_SECRET_KEY) return true;
+  if (!token) return false;
+  const form = new FormData();
+  form.set("secret", securityEnv.TURNSTILE_SECRET_KEY);
+  form.set("response", token);
+  const ip = request.headers.get("CF-Connecting-IP");
+  if (ip) form.set("remoteip", ip);
+  const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
+  const result = await response.json() as { success?: boolean };
+  return result.success === true;
+}
+
+export async function recordSecurityEvent(type: string, subject?: string, userId?: string, details: Record<string, unknown> = {}) {
+  try {
+    const subjectHash = subject ? await hashToken(subject.trim().toLowerCase()) : null;
+    await env.DB.prepare("INSERT INTO security_events (id,type,user_id,subject_hash,details) VALUES (?,?,?,?,?)")
+      .bind(crypto.randomUUID(), type, userId ?? null, subjectHash, JSON.stringify(details)).run();
+  } catch (error) { console.error("security_event_failed", type, error); }
 }
 
 export async function hashPassword(password: string, salt = crypto.getRandomValues(new Uint8Array(16))) {
@@ -71,7 +93,7 @@ export async function getCurrentUser(): Promise<AppUser | null> {
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;
-  const row = await env.DB.prepare(`SELECT u.id,u.name,u.email,u.role,u.phone FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND datetime(s.expires_at)>datetime('now')`).bind(await hashToken(token)).first<AppUser>();
+  const row = await env.DB.prepare(`SELECT u.id,u.name,u.email,u.role,u.phone,u.email_verified_at AS emailVerifiedAt FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND datetime(s.expires_at)>datetime('now')`).bind(await hashToken(token)).first<AppUser>();
   return row ?? null;
 }
 

@@ -1,0 +1,3 @@
+import { env } from "cloudflare:workers";
+import { requireAdmin } from "../../../auth";
+export async function GET(){if(!await requireAdmin())return Response.json({error:"Acesso negado."},{status:403});const events=await env.DB.prepare("SELECT id,type,user_id AS userId,details,created_at AS createdAt FROM security_events ORDER BY datetime(created_at) DESC LIMIT 50").all();const summary=await env.DB.prepare("SELECT type,count(*) AS total FROM security_events WHERE datetime(created_at)>=datetime('now','-7 days') GROUP BY type").all();return Response.json({events:events.results,summary:summary.results})}
