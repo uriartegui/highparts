@@ -1,7 +1,6 @@
 import { env } from "cloudflare:workers";
 import { cookies } from "next/headers";
 
-export const ADMIN_EMAIL = "alisson@highparts.com.br";
 const COOKIE_NAME = "highparts_session";
 const SESSION_DAYS = 30;
 
@@ -13,6 +12,20 @@ function bytesToBase64(bytes: Uint8Array) {
 
 function base64ToBytes(value: string) {
   return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
+}
+
+function bytesToHex(bytes: Uint8Array) {
+  return [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+export async function hashToken(token: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return bytesToHex(new Uint8Array(digest));
+}
+
+export function isTrustedRequest(request: Request) {
+  const origin = request.headers.get("origin");
+  return !origin || origin === new URL(request.url).origin;
 }
 
 export async function hashPassword(password: string, salt = crypto.getRandomValues(new Uint8Array(16))) {
@@ -35,25 +48,30 @@ export async function verifyPassword(password: string, encoded: string) {
 }
 
 export async function createSession(userId: string) {
-  const id = crypto.randomUUID() + crypto.randomUUID().replaceAll("-", "");
+  const token = crypto.randomUUID() + crypto.randomUUID().replaceAll("-", "");
+  const id = await hashToken(token);
   const expires = new Date(Date.now() + SESSION_DAYS * 86_400_000);
-  await env.DB.prepare("INSERT INTO sessions (id,user_id,expires_at) VALUES (?,?,?)").bind(id, userId, expires.toISOString()).run();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM sessions WHERE datetime(expires_at)<=datetime('now')"),
+    env.DB.prepare("INSERT INTO sessions (id,user_id,expires_at) VALUES (?,?,?)").bind(id, userId, expires.toISOString()),
+    env.DB.prepare("DELETE FROM sessions WHERE user_id=? AND id NOT IN (SELECT id FROM sessions WHERE user_id=? ORDER BY created_at DESC LIMIT 5)").bind(userId, userId),
+  ]);
   const store = await cookies();
-  store.set(COOKIE_NAME, id, { httpOnly: true, secure: true, sameSite: "lax", path: "/", expires });
+  store.set(COOKIE_NAME, token, { httpOnly: true, secure: true, sameSite: "lax", path: "/", expires, priority: "high" });
 }
 
 export async function destroySession() {
   const store = await cookies();
-  const id = store.get(COOKIE_NAME)?.value;
-  if (id) await env.DB.prepare("DELETE FROM sessions WHERE id=?").bind(id).run();
-  store.delete(COOKIE_NAME);
+  const token = store.get(COOKIE_NAME)?.value;
+  if (token) await env.DB.prepare("DELETE FROM sessions WHERE id=?").bind(await hashToken(token)).run();
+  store.set(COOKIE_NAME, "", { httpOnly: true, secure: true, sameSite: "lax", path: "/", maxAge: 0 });
 }
 
 export async function getCurrentUser(): Promise<AppUser | null> {
   const store = await cookies();
-  const id = store.get(COOKIE_NAME)?.value;
-  if (!id) return null;
-  const row = await env.DB.prepare(`SELECT u.id,u.name,u.email,u.role,u.phone FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND s.expires_at>CURRENT_TIMESTAMP`).bind(id).first<AppUser>();
+  const token = store.get(COOKIE_NAME)?.value;
+  if (!token) return null;
+  const row = await env.DB.prepare(`SELECT u.id,u.name,u.email,u.role,u.phone FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.id=? AND datetime(s.expires_at)>datetime('now')`).bind(await hashToken(token)).first<AppUser>();
   return row ?? null;
 }
 

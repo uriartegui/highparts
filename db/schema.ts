@@ -49,3 +49,14 @@ export const savedCartItems = sqliteTable("saved_cart_items", {
   quantity: integer("quantity").notNull().default(1), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const loginAttempts = sqliteTable("login_attempts", {
+  email: text("email").primaryKey(), attempts: integer("attempts").notNull().default(0),
+  windowStartedAt: text("window_started_at").notNull().default(sql`CURRENT_TIMESTAMP`), lockedUntil: text("locked_until"),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const passwordResetTokens = sqliteTable("password_reset_tokens", {
+  tokenHash: text("token_hash").primaryKey(), userId: text("user_id").notNull().references(() => users.id),
+  expiresAt: text("expires_at").notNull(), usedAt: text("used_at"), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});

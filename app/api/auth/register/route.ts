@@ -1,8 +1,9 @@
 import { env } from "cloudflare:workers";
-import { ADMIN_EMAIL, createSession, hashPassword } from "../../../auth";
+import { createSession, hashPassword, isTrustedRequest } from "../../../auth";
 
 export async function POST(request: Request) {
-  const input = await request.json() as { name?: string; email?: string; password?: string; confirmPassword?: string; phone?: string };
+  if (!isTrustedRequest(request)) return Response.json({ error: "Origem da solicitação não permitida." }, { status: 403 });
+  const input = await request.json().catch(() => ({})) as { name?: string; email?: string; password?: string; confirmPassword?: string; phone?: string };
   const name = input.name?.trim() ?? "";
   const email = input.email?.trim().toLowerCase() ?? "";
   const password = input.password ?? "";
@@ -11,7 +12,8 @@ export async function POST(request: Request) {
   if (name.length < 2) fieldErrors.name = "Informe seu nome completo.";
   if (!/^\S+@\S+\.\S+$/.test(email)) fieldErrors.email = "Informe um e-mail válido.";
   if (!/^\d{11}$/.test(phone)) fieldErrors.phone = "Informe um celular válido com DDD.";
-  if (password.length < 8) fieldErrors.password = "A senha deve ter pelo menos 8 caracteres.";
+  if (password.length < 10) fieldErrors.password = "A senha deve ter pelo menos 10 caracteres.";
+  else if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) fieldErrors.password = "Use pelo menos uma letra e um número.";
   if (password !== (input.confirmPassword ?? "")) fieldErrors.confirmPassword = "As senhas não coincidem.";
 
   const [emailOwner, phoneOwner] = await Promise.all([
@@ -24,7 +26,7 @@ export async function POST(request: Request) {
     return Response.json({ fieldErrors }, { status: emailOwner || phoneOwner ? 409 : 400 });
   }
   const id = crypto.randomUUID();
-  const role = email === ADMIN_EMAIL ? "admin" : "customer";
+  const role = "customer";
   try {
     await env.DB.prepare("INSERT INTO users (id,name,email,password_hash,role,phone) VALUES (?,?,?,?,?,?)")
       .bind(id, name, email, await hashPassword(password), role, phone).run();

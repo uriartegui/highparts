@@ -1,1 +1,1 @@
-export { ADMIN_EMAIL, requireAdmin as getAdmin } from "../auth";
+export { requireAdmin as getAdmin } from "../auth";
