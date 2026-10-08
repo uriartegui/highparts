@@ -6,5 +6,6 @@ declare namespace Cloudflare {
     AUTH_FROM_EMAIL?: string;
     TURNSTILE_SITE_KEY?: string;
     TURNSTILE_SECRET_KEY?: string;
+    VEHICLE_API_TOKEN?: string;
   }
 }

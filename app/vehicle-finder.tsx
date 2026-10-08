@@ -4,7 +4,7 @@ import { Bot, Check, ChevronLeft, ChevronRight, Disc3, Gauge, Search, ShieldChec
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 type CatalogItem = { code:string; application:string; axle:string; product:string; type:string; hub:string; original:string };
-type Vehicle = { brand:string; model:string; version:string; year:string };
+type Vehicle = { brand:string; model:string; version:string; year:string; engine?:string|null };
 type Stage = "vehicle"|"item"|"details"|"results";
 type LookupMode = "plate"|"renavam";
 
@@ -31,9 +31,15 @@ export default function VehicleFinder(){
 
   useEffect(()=>{fetch("/catalog.json").then(r=>r.json()).then(setCatalog).catch(()=>setCatalog([]))},[]);
   const normalized=mode==="plate"?identifier.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,7):identifier.replace(/\D/g,"").slice(0,11);
-  const golCatalog=useMemo(()=>catalog.filter(item=>{const app=item.application.toUpperCase();return app.includes("[VW]")&&app.includes("GOL")}),[catalog]);
-  const productChoices=useMemo(()=>choiceMeta.filter(choice=>golCatalog.some(item=>item.product.toUpperCase().includes(choice.match))),[golCatalog]);
-  const relevantItems=useMemo(()=>golCatalog.filter(item=>!product||item.product.toUpperCase().includes(product)),[golCatalog,product]);
+  const vehicleCatalog=useMemo(()=>{
+    if(!vehicle)return [];
+    const rawBrand=vehicle.brand.toUpperCase();
+    const brand=rawBrand.includes("VOLKSWAGEN")||rawBrand==="VW"?"VW":rawBrand.includes("CHEVROLET")?"GM":rawBrand.split(/\s|\//)[0];
+    const model=vehicle.model.toUpperCase().replace(rawBrand,"").replace(/^(VW|VOLKSWAGEN|GM|CHEVROLET)\s*[/-]?\s*/,"").trim().split(/\s|\//)[0];
+    return catalog.filter(item=>{const app=item.application.toUpperCase();return app.includes(`[${brand}]`)&&app.includes(model)});
+  },[catalog,vehicle]);
+  const productChoices=useMemo(()=>choiceMeta.filter(choice=>vehicleCatalog.some(item=>item.product.toUpperCase().includes(choice.match))),[vehicleCatalog]);
+  const relevantItems=useMemo(()=>vehicleCatalog.filter(item=>!product||item.product.toUpperCase().includes(product)),[vehicleCatalog,product]);
   const engineOptions=useMemo(()=>{const values=new Set<string>();relevantItems.forEach(item=>Array.from(item.application.matchAll(/\b(1\.[0-9]|2\.[0-9])\b/g)).forEach(match=>values.add(match[1])));return Array.from(values).sort()},[relevantItems]);
   const axleOptions=useMemo(()=>{const values:string[]=[];if(relevantItems.some(item=>item.axle.toUpperCase().includes("DIANT")))values.push("DIANT.");if(relevantItems.some(item=>item.axle.toUpperCase().includes("TRAS")))values.push("TRAS.");values.push("QUALQUER");return values},[relevantItems]);
 
@@ -42,11 +48,11 @@ export default function VehicleFinder(){
     setOpen(true);setStage("vehicle");
     const valid=mode==="plate"?normalized.length===7:normalized.length===11;
     if(!valid){setError(mode==="plate"?"Digite uma placa válida com 7 caracteres.":"Digite um RENAVAM válido com 11 números.");return}
-    if(mode!=="plate"||normalized!=="ABC1234"){setError("A consulta automática ainda aguarda a conexão com a base veicular. Para testar o fluxo completo agora, use a placa ABC1234.");return}
     setError("");setLoading(true);
-    setTimeout(()=>{setVehicle({brand:"Volkswagen",model:"Gol",version:"1.6",year:"2001"});setEngine("1.6");setLoading(false);setStage("item")},500);
+    if(mode==="plate"&&normalized==="ABC1234"){setTimeout(()=>{setVehicle({brand:"Volkswagen",model:"Gol",version:"1.6",year:"2001",engine:"1.6"});setEngine("1.6");setLoading(false);setStage("item")},400);return}
+    fetch("/api/vehicle/lookup",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({type:mode,value:normalized})}).then(async response=>{const data=await response.json() as {vehicle?:Vehicle;error?:string};if(!response.ok||!data.vehicle)throw new Error(data.error||"Não foi possível identificar o veículo.");setVehicle(data.vehicle);setEngine(data.vehicle.engine||"");setStage("item")}).catch(reason=>setError(reason instanceof Error?reason.message:"Não foi possível identificar o veículo.")).finally(()=>setLoading(false));
   };
-  const results=useMemo(()=>catalog.filter(item=>{const app=item.application.toUpperCase();const prod=item.product.toUpperCase();const axleOk=axle==="QUALQUER"||item.axle.toUpperCase().includes(axle);const engineOk=!engine||app.includes(engine);const absOk=abs==="Não sei"||(abs==="Sim"?app.includes("ABS")&&!app.includes("- ABS"):!app.includes("+ ABS"));return app.includes("[VW]")&&app.includes("GOL")&&engineOk&&prod.includes(product)&&axleOk&&absOk}).slice(0,12),[catalog,product,abs,axle,engine]);
+  const results=useMemo(()=>vehicleCatalog.filter(item=>{const app=item.application.toUpperCase();const prod=item.product.toUpperCase();const axleOk=axle==="QUALQUER"||item.axle.toUpperCase().includes(axle);const engineOk=!engine||app.includes(engine);const absOk=abs==="Não sei"||(abs==="Sim"?app.includes("ABS")&&!app.includes("- ABS"):!app.includes("+ ABS"));return engineOk&&prod.includes(product)&&axleOk&&absOk}).slice(0,12),[vehicleCatalog,product,abs,axle,engine]);
   const reset=()=>{setStage("vehicle");setVehicle(null);setProduct("");setError("")};
 
   return <>
