@@ -21,8 +21,12 @@ export async function GET(request: Request) {
   }
   if (saleOnly) conditions.push("price_cents IS NOT NULL AND stock_quantity > 0");
   if (category) { conditions.push("product = ?"); bindings.push(category); }
-  if (brand) { conditions.push("application LIKE ?"); bindings.push(`%[${brand}]%`); }
-  if (axle) { conditions.push("axle LIKE ?"); bindings.push(`%${axle}%`); }
+  if (brand === "VOLKSWAGEN") { conditions.push("(application LIKE ? OR application LIKE ?)"); bindings.push("%[VW]%", "%[VOLKSWAGEN]%"); }
+  else if (brand === "CHEVROLET") { conditions.push("(application LIKE ? OR application LIKE ?)"); bindings.push("%[GM]%", "%[CHEVROLET]%"); }
+  else if (brand) { conditions.push("application LIKE ?"); bindings.push(`%[${brand}]%`); }
+  if (axle === "DIANTEIRO") conditions.push("(UPPER(axle) LIKE 'D%' OR UPPER(axle) LIKE '%DIANT%') AND UPPER(axle) NOT LIKE '%TRAS%' AND UPPER(axle) NOT LIKE '%/T%'");
+  else if (axle === "TRASEIRO") conditions.push("(UPPER(axle) LIKE 'T%' OR UPPER(axle) LIKE '%TRAS%') AND UPPER(axle) NOT LIKE '%DIANT%' AND UPPER(axle) NOT LIKE 'D/T%'");
+  else if (axle === "DIANTEIRO / TRASEIRO") conditions.push("(UPPER(axle) LIKE '%DIANT%TRAS%' OR UPPER(axle) LIKE 'D/T%')");
 
   const statement = env.DB.prepare(`
     SELECT code, product, application, axle, type, hub,
@@ -43,8 +47,18 @@ export async function GET(request: Request) {
       env.DB.prepare("SELECT DISTINCT axle AS value FROM products WHERE active=1 AND axle<>'' ORDER BY axle").all<{value:string}>(),
     ]);
     const brands = new Set<string>();
-    for (const row of applications.results) for (const match of row.application.matchAll(/\[([^\]]+)\]/g)) brands.add(match[1].trim());
-    facets = { categories:categories.results.map(x=>x.value), brands:[...brands].sort(), axles:axles.results.map(x=>x.value) };
+    for (const row of applications.results) for (const match of row.application.matchAll(/\[([^\]]+)\]/g)) {
+      let value = match[1].trim().toUpperCase();
+      if (!/^[A-ZÀ-Ü][A-ZÀ-Ü &/-]{1,28}$/.test(value)) continue;
+      if (value === "VW") value = "VOLKSWAGEN";
+      if (value === "GM") value = "CHEVROLET";
+      brands.add(value);
+    }
+    facets = {
+      categories: categories.results.map(x=>x.value).filter(value=>/^(CILINDRO MESTRE|CUBO DE RODA|DISCO DE FREIO|TAMBOR DE FREIO)$/i.test(value)),
+      brands:[...brands].sort(),
+      axles: axles.results.length ? ["DIANTEIRO", "TRASEIRO", "DIANTEIRO / TRASEIRO"] : [],
+    };
   }
   return Response.json({ products: products.results, total: total?.count ?? 0, facets });
 }
