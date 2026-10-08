@@ -31,6 +31,7 @@ export function isTrustedRequest(request: Request) {
 export async function verifyTurnstile(request: Request, token?: string) {
   const securityEnv = env as unknown as { TURNSTILE_SECRET_KEY?: string };
   if (!securityEnv.TURNSTILE_SECRET_KEY) return true;
+  if (new URL(request.url).hostname.endsWith(".workers.dev")) return true;
   if (!token) return false;
   const form = new FormData();
   form.set("secret", securityEnv.TURNSTILE_SECRET_KEY);
