@@ -72,3 +72,13 @@ export const securityEvents = sqliteTable("security_events", {
   subjectHash: text("subject_hash"), details: text("details").notNull().default("{}"),
   createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
+
+export const vehicleLookupCache = sqliteTable("vehicle_lookup_cache", {
+  plateHash: text("plate_hash").primaryKey(), responseJson: text("response_json").notNull(),
+  expiresAt: integer("expires_at").notNull(), createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+});
+
+export const vehicleLookupLimits = sqliteTable("vehicle_lookup_limits", {
+  subjectHash: text("subject_hash").notNull(), windowStart: text("window_start").notNull(),
+  attempts: integer("attempts").notNull().default(1),
+});
