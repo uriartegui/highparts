@@ -14,7 +14,7 @@ const groups = [
 export default function StoreHeader({userName,cartCount=0,onCart,darkTopbar=true}:Props){
   const [open,setOpen]=useState(false);
   return <>
-    {darkTopbar&&<div className="topbar"><span>Catálogo técnico Hipper Freios</span><span>Compatibilidade orientada por veículo</span></div>}
+    {darkTopbar&&<div className="topbar"><span>Catálogo técnico HighParts</span><span>Compatibilidade orientada por veículo</span></div>}
     <header className="header store-header">
       <button className="mobile-menu" onClick={()=>setOpen(!open)} aria-label={open?"Fechar menu":"Abrir menu"}>{open?<X/>:<Menu/>}</button>
       <a href="/" aria-label="HighParts — página inicial"><img className="logo" src="/highparts-logo.png" alt="HighParts"/></a>
