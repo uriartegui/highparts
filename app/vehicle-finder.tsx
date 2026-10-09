@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 type CatalogItem = { code:string; application:string; axle:string; product:string; type:string; hub:string; original:string };
 type Vehicle = { brand:string; model:string; version:string; year:string; engine?:string|null };
 type Stage = "vehicle"|"item"|"details"|"results";
+type LookupMode = "plate"|"manual";
 
 const choiceMeta = [
   {label:"Disco de freio",match:"DISCO DE FREIO",icon:"◉"},
@@ -14,9 +15,20 @@ const choiceMeta = [
   {label:"Cilindro mestre",match:"CILINDRO MESTRE",icon:"▣"},
 ];
 
+function applicationSupportsYear(application:string,yearValue:string){
+  const year=Number(yearValue);
+  if(!Number.isInteger(year)||year<1900||year>2100)return true;
+  const ranges=Array.from(application.matchAll(/(19\d{2}|20\d{2})\s*>\s*(19\d{2}|20\d{2})/g),match=>[Number(match[1]),Number(match[2])] as const);
+  const openStarts=Array.from(application.matchAll(/(19\d{2}|20\d{2})\s*>(?!\s*(?:19|20)\d{2})/g),match=>Number(match[1]));
+  const openEnds=Array.from(application.matchAll(/<\s*(19\d{2}|20\d{2})/g),match=>Number(match[1]));
+  if(!ranges.length&&!openStarts.length&&!openEnds.length)return true;
+  return ranges.some(([start,end])=>year>=start&&year<=end)||openStarts.some(start=>year>=start)||openEnds.some(end=>year<=end);
+}
+
 export default function VehicleFinder(){
   const [open,setOpen]=useState(false);
   const [stage,setStage]=useState<Stage>("vehicle");
+  const [lookupMode,setLookupMode]=useState<LookupMode>("plate");
   const [identifier,setIdentifier]=useState("");
   const [vehicle,setVehicle]=useState<Vehicle|null>(null);
   const [catalog,setCatalog]=useState<CatalogItem[]>([]);
@@ -29,15 +41,17 @@ export default function VehicleFinder(){
 
   useEffect(()=>{fetch("/catalog.json").then(r=>r.json()).then(setCatalog).catch(()=>setCatalog([]))},[]);
   const normalized=identifier.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,7);
+  const brands=useMemo(()=>Array.from(new Set(catalog.flatMap(item=>Array.from(item.application.matchAll(/\[([^\]]+)\]/g),match=>match[1].trim())).filter(brand=>/^[A-ZÀ-Ü][A-ZÀ-Ü .-]{1,24}$/i.test(brand)))).sort((a,b)=>a.localeCompare(b,"pt-BR")),[catalog]);
   const vehicleCatalog=useMemo(()=>{
     if(!vehicle)return [];
     const rawBrand=vehicle.brand.toUpperCase();
-    const brand=rawBrand.includes("VOLKSWAGEN")||rawBrand==="VW"?"VW":rawBrand.includes("CHEVROLET")?"GM":rawBrand.split(/\s|\//)[0];
+    const brandTags=rawBrand.includes("VOLKSWAGEN")||rawBrand==="VW"?["VW","VOLKSWAGEN"]:rawBrand.includes("CHEVROLET")||rawBrand==="GM"?["GM","CHEVROLET"]:[rawBrand.split(/\s|\//)[0]];
     const model=vehicle.model.toUpperCase().replace(rawBrand,"").replace(/^(VW|VOLKSWAGEN|GM|CHEVROLET)\s*[/-]?\s*/,"").trim().split(/\s|\//)[0];
-    return catalog.filter(item=>{const app=item.application.toUpperCase();return app.includes(`[${brand}]`)&&app.includes(model)});
+    return catalog.filter(item=>{const app=item.application.toUpperCase().replace(/\[\s+/g,"[");return brandTags.some(brand=>app.includes(`[${brand}]`))&&app.includes(model)});
   },[catalog,vehicle]);
-  const productChoices=useMemo(()=>choiceMeta.filter(choice=>vehicleCatalog.some(item=>item.product.toUpperCase().includes(choice.match))),[vehicleCatalog]);
-  const relevantItems=useMemo(()=>vehicleCatalog.filter(item=>!product||item.product.toUpperCase().includes(product)),[vehicleCatalog,product]);
+  const yearCatalog=useMemo(()=>vehicleCatalog.filter(item=>applicationSupportsYear(item.application,vehicle?.year||"")),[vehicleCatalog,vehicle]);
+  const productChoices=useMemo(()=>choiceMeta.filter(choice=>yearCatalog.some(item=>item.product.toUpperCase().includes(choice.match))),[yearCatalog]);
+  const relevantItems=useMemo(()=>yearCatalog.filter(item=>!product||item.product.toUpperCase().includes(product)),[yearCatalog,product]);
   const engineOptions=useMemo(()=>{const values=new Set<string>();relevantItems.forEach(item=>Array.from(item.application.matchAll(/\b(1\.[0-9]|2\.[0-9])\b/g)).forEach(match=>values.add(match[1])));return Array.from(values).sort()},[relevantItems]);
   const axleOptions=useMemo(()=>{const values:string[]=[];if(relevantItems.some(item=>item.axle.toUpperCase().includes("DIANT")))values.push("DIANT.");if(relevantItems.some(item=>item.axle.toUpperCase().includes("TRAS")))values.push("TRAS.");values.push("QUALQUER");return values},[relevantItems]);
 
@@ -46,9 +60,10 @@ export default function VehicleFinder(){
     if(normalized.length!==7){setError("Digite uma placa válida com 7 caracteres.");return}
     setError("");setLoading(true);
     if(normalized==="ABC1234"){setTimeout(()=>{setVehicle({brand:"Volkswagen",model:"Gol",version:"1.6",year:"2001",engine:"1.6"});setEngine("1.6");setLoading(false);setStage("item")},400);return}
-    fetch("/api/vehicle/lookup",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({type:"plate",value:normalized})}).then(async response=>{const data=await response.json() as {vehicle?:Vehicle;error?:string};if(!response.ok||!data.vehicle)throw new Error(data.error||"Não foi possível identificar o veículo.");setVehicle(data.vehicle);setEngine(data.vehicle.engine||"");setStage("item")}).catch(reason=>setError(reason instanceof Error?reason.message:"Não foi possível identificar o veículo.")).finally(()=>setLoading(false));
+    setLoading(false);setError("A consulta automática de placas será ativada em breve. Por enquanto, escolha o veículo manualmente.");
   };
-  const results=useMemo(()=>vehicleCatalog.filter(item=>{const app=item.application.toUpperCase();const prod=item.product.toUpperCase();const axleOk=axle==="QUALQUER"||item.axle.toUpperCase().includes(axle);const engineOk=!engine||app.includes(engine);const absOk=abs==="Não sei"||(abs==="Sim"?app.includes("ABS")&&!app.includes("- ABS"):!app.includes("+ ABS"));return engineOk&&prod.includes(product)&&axleOk&&absOk}).slice(0,12),[vehicleCatalog,product,abs,axle,engine]);
+  const manualLookup=(event:React.FormEvent<HTMLFormElement>)=>{event.preventDefault();const data=new FormData(event.currentTarget);const brand=String(data.get("brand")||"").trim();const model=String(data.get("model")||"").trim();const year=String(data.get("year")||"").trim();const selectedEngine=String(data.get("engine")||"").trim();if(!brand||!model){setError("Informe a marca e o modelo do veículo.");return}setError("");setIdentifier("");setVehicle({brand,model,version:selectedEngine?`Motor ${selectedEngine}`:"Versão a confirmar",year:year||"Ano a confirmar",engine:selectedEngine||null});setEngine(selectedEngine);setStage("item")};
+  const results=useMemo(()=>yearCatalog.filter(item=>{const app=item.application.toUpperCase();const prod=item.product.toUpperCase();const axleOk=axle==="QUALQUER"||item.axle.toUpperCase().includes(axle);const engineOk=!engine||app.includes(engine);const absOk=abs==="Não sei"||(abs==="Sim"?app.includes("ABS")&&!app.includes("- ABS"):!app.includes("+ ABS"));return engineOk&&prod.includes(product)&&axleOk&&absOk}).slice(0,12),[yearCatalog,product,abs,axle,engine]);
   const reset=()=>{setStage("vehicle");setVehicle(null);setProduct("");setError("")};
 
   return <>
@@ -61,8 +76,8 @@ export default function VehicleFinder(){
 
     <div className={`vehicle-overlay ${open?"show":""}`} onClick={()=>setOpen(false)}/>
     <section className={`vehicle-modal ${open?"show":""}`} aria-hidden={!open}><header><img src="/highparts-logo.png" alt="HighParts"/><span>ASSISTENTE DE COMPATIBILIDADE</span><button onClick={()=>setOpen(false)} aria-label="Fechar"><X/></button></header><div className="vehicle-progress"><i className="active"/><i className={stage!=="vehicle"?"active":""}/><i className={stage==="details"||stage==="results"?"active":""}/><i className={stage==="results"?"active":""}/></div>
-      {stage==="vehicle"&&<div className="vehicle-step intro conversation"><small>PASSO 1 DE 4</small><h2>Vamos encontrar a peça certa.</h2><AssistantMessage>Primeiro, informe a placa. Assim eu identifico o veículo e faço apenas as perguntas que diferenciam as peças.</AssistantMessage><label className="big-plate"><span>BRASIL · PLACA</span><input autoFocus value={normalized} onChange={e=>setIdentifier(e.target.value)} onKeyDown={e=>e.key==="Enter"&&lookup()} placeholder="ABC1D23"/></label>{error&&<em className="lookup-error">{error}</em>}<button className="vehicle-next" onClick={lookup} disabled={loading}>{loading?"Identificando veículo...":"Continuar"}<ChevronRight/></button><div className="demo-hint"><Sparkles/><span><b>Experimente com ABC1234</b><small>O assistente usa as aplicações reais da planilha e identifica placas reais pela API veicular.</small></span></div></div>}
-      {stage==="item"&&vehicle&&<div className="vehicle-step conversation"><small>PASSO 2 DE 4</small><div className="identified"><Check/><span><b>{vehicle.brand} {vehicle.model}</b><small>{vehicle.version} • {vehicle.year} • Placa {normalized}</small></span><button onClick={reset}>Alterar</button></div><AssistantMessage>Encontrei seu {vehicle.model}. Qual tipo de peça você está procurando?</AssistantMessage><div className="choice-grid">{productChoices.map(choice=><button key={choice.match} onClick={()=>{setProduct(choice.match);setStage("details")}}><i>{choice.icon}</i><b>{choice.label}</b><ChevronRight/></button>)}</div></div>}
+      {stage==="vehicle"&&<div className="vehicle-step intro conversation"><small>PASSO 1 DE 4</small><h2>Vamos encontrar a peça certa.</h2><AssistantMessage>{lookupMode==="plate"?"Digite a placa para conhecer a demonstração. A consulta automática será ativada quando o serviço veicular for contratado.":"Escolha a marca e informe o modelo. O assistente cruzará esses dados diretamente com o catálogo HighParts."}</AssistantMessage><div className="finder-mode-tabs"><button className={lookupMode==="plate"?"active":""} onClick={()=>{setLookupMode("plate");setError("")}}>Consultar placa</button><button className={lookupMode==="manual"?"active":""} onClick={()=>{setLookupMode("manual");setError("")}}>Escolher veículo</button></div>{lookupMode==="plate"?<><label className="big-plate"><span>BRASIL · PLACA</span><input autoFocus value={normalized} onChange={e=>setIdentifier(e.target.value)} onKeyDown={e=>e.key==="Enter"&&lookup()} placeholder="ABC1D23"/></label>{error&&<><em className="lookup-error">{error}</em><button className="manual-shortcut" onClick={()=>{setLookupMode("manual");setError("")}}>Escolher marca e modelo agora</button></>}<button className="vehicle-next" onClick={lookup} disabled={loading}>{loading?"Identificando veículo...":"Continuar"}<ChevronRight/></button><div className="demo-hint"><Sparkles/><span><b>Experimente com ABC1234</b><small>Essa placa demonstra todo o fluxo usando as aplicações reais da planilha.</small></span></div></>:<form className="manual-vehicle-form" onSubmit={manualLookup}><label>Marca<select name="brand" required defaultValue=""><option value="" disabled>Selecione a marca</option>{brands.map(brand=><option value={brand} key={brand}>{brand}</option>)}</select></label><label>Modelo<input name="model" required placeholder="Ex.: Gol, Onix, Civic"/></label><div><label>Ano<input name="year" inputMode="numeric" maxLength={4} placeholder="Ex.: 2018"/></label><label>Motor<input name="engine" inputMode="decimal" placeholder="Ex.: 1.6"/></label></div>{error&&<em className="lookup-error">{error}</em>}<button className="vehicle-next">Continuar <ChevronRight/></button></form>}</div>}
+      {stage==="item"&&vehicle&&<div className="vehicle-step conversation"><small>PASSO 2 DE 4</small><div className="identified"><Check/><span><b>{vehicle.brand} {vehicle.model}</b><small>{vehicle.version} • {vehicle.year}{normalized?` • Placa ${normalized}`:" • Seleção manual"}</small></span><button onClick={reset}>Alterar</button></div><AssistantMessage>{productChoices.length?`Encontrei aplicações para ${vehicle.model}. Qual tipo de peça você está procurando?`:`Não encontrei ${vehicle.model} nessa marca exatamente como foi escrito. Confira o nome ou tente uma forma mais curta, como “Gol” em vez de “Gol G5”.`}</AssistantMessage>{productChoices.length?<div className="choice-grid">{productChoices.map(choice=><button key={choice.match} onClick={()=>{setProduct(choice.match);setStage("details")}}><i>{choice.icon}</i><b>{choice.label}</b><ChevronRight/></button>)}</div>:<button className="vehicle-next" onClick={reset}>Revisar veículo <ChevronLeft/></button>}</div>}
       {stage==="details"&&<div className="vehicle-step conversation"><small>PASSO 3 DE 4</small><button className="step-back" onClick={()=>setStage("item")}><ChevronLeft/> Voltar</button><AssistantMessage>Agora preciso confirmar alguns detalhes que mudam a aplicação dessa peça no catálogo.</AssistantMessage><Question title="O veículo possui ABS?" value={abs} options={["Sim","Não","Não sei"]} onChange={setAbs}/><Question title="Em qual eixo vai a peça?" value={axle} options={axleOptions} labels={axleOptions.map(value=>value==="DIANT."?"Dianteiro":value==="TRAS."?"Traseiro":"Não sei")} onChange={setAxle}/>{engineOptions.length>0&&<Question title="Qual é a motorização?" value={engine} options={engineOptions} onChange={setEngine}/>}<button className="vehicle-next" onClick={()=>setStage("results")}>Ver peças compatíveis <ChevronRight/></button></div>}
       {stage==="results"&&<div className="vehicle-step results"><small>PASSO 4 DE 4</small><div className="result-head"><span><h2>{results.length} peças encontradas</h2><p>{vehicle?.brand} {vehicle?.model} {engine} • {abs==="Não sei"?"ABS não informado":`${abs==="Sim"?"Com":"Sem"} ABS`} • {axle==="DIANT."?"Dianteiro":axle==="TRAS."?"Traseiro":"Todos os eixos"}</p></span><button onClick={()=>setStage("details")}>Ajustar respostas</button></div><div className="catalog-results">{results.map(item=><article key={item.code}><div className="mini-disc"><Disc3/></div><div><small>{item.product} • {item.axle}</small><h3>{item.code}</h3><p>{item.type||"Aplicação original"}{item.hub?` • Cubo ${item.hub.toLowerCase()}`:""}</p><details><summary>Ver aplicação completa</summary><p>{item.application}</p></details></div><button onClick={()=>{location.href=`/produto/${encodeURIComponent(item.code)}`}}>Ver produto <ChevronRight/></button></article>)}{!results.length&&<div className="no-result"><Gauge/><h3>Nenhum item com todos esses filtros</h3><p>Tente marcar “Não sei” em ABS ou eixo para ampliar a busca.</p><button onClick={()=>setStage("details")}>Revisar respostas</button></div>}</div><div className="catalog-note"><ShieldCheck/><span><b>Dados do catálogo HighParts</b><small>{catalog.length.toLocaleString("pt-BR")} aplicações importadas. Confirme ano e versão antes da compra.</small></span></div></div>}
     </section>
