@@ -4,7 +4,10 @@ import { requireUser } from "../../../auth";
 export async function GET() {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Não autorizado" }, { status: 401 });
-  const orders = await env.DB.prepare("SELECT id,total_cents AS totalCents,status,payment_provider AS paymentProvider,vehicle_plate AS vehiclePlate,created_at AS createdAt FROM orders WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
+  const orders = await env.DB.prepare(`SELECT o.id,o.total_cents AS totalCents,o.status,o.payment_provider AS paymentProvider,
+    o.vehicle_plate AS vehiclePlate,o.shipping_address AS shippingAddress,o.created_at AS createdAt,
+    COALESCE((SELECT SUM(i.quantity) FROM order_snapshot_items i WHERE i.order_id=o.id),0) AS itemCount
+    FROM orders o WHERE o.user_id=? ORDER BY o.created_at DESC`).bind(user.id).all();
   return Response.json({ orders: orders.results });
 }
 
