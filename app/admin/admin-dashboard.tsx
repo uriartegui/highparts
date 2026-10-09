@@ -1,33 +1,552 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Boxes, Check, ChevronLeft, Database, LoaderCircle, PackageSearch, RefreshCw, Save, Search, ShieldCheck, ShoppingBag } from "lucide-react";
+import {
+  Boxes,
+  Check,
+  ChevronLeft,
+  Database,
+  LoaderCircle,
+  PackageSearch,
+  RefreshCw,
+  Save,
+  Search,
+  ShieldCheck,
+  ShoppingBag,
+} from "lucide-react";
 
-type Product = { code:string; product:string; application:string; axle:string; type:string; priceCents:number|null; stockQuantity:number|null; imageUrl:string|null; active:boolean };
-type Summary = { products:number; priced:number; stockDefined:number; orders:number };
-type Order = { id:string; customerName:string; customerEmail:string; customerPhone:string; totalCents:number; status:string; paymentProvider:string; createdAt:string; itemCount:number };
+type Product = {
+  code: string;
+  product: string;
+  application: string;
+  axle: string;
+  type: string;
+  priceCents: number | null;
+  stockQuantity: number | null;
+  imageUrl: string | null;
+  active: boolean;
+};
+type Summary = {
+  products: number;
+  priced: number;
+  stockDefined: number;
+  orders: number;
+};
+type Order = {
+  id: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  totalCents: number;
+  status: string;
+  paymentProvider: string;
+  createdAt: string;
+  itemCount: number;
+};
 type Tab = "inventory" | "orders";
-type InventoryFilter = "all"|"missing-price"|"missing-stock"|"ready";
-const statusLabels:Record<string,string>={awaiting_payment:"Aguardando pagamento",paid:"Pago",processing:"Em separação",shipped:"Enviado",delivered:"Entregue",cancelled:"Cancelado"};
-const money=(cents:number)=>new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL"}).format(cents/100);
+type InventoryFilter = "all" | "missing-price" | "missing-stock" | "ready";
+const statusLabels: Record<string, string> = {
+  awaiting_payment: "Aguardando pagamento",
+  paid: "Pago",
+  processing: "Em separação",
+  shipped: "Enviado",
+  delivered: "Entregue",
+  cancelled: "Cancelado",
+};
+const money = (cents: number) =>
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
+    cents / 100,
+  );
 
-export default function AdminDashboard({adminEmail}:{adminEmail:string}) {
-  const [tab,setTab]=useState<Tab>("inventory");
-  const [summary,setSummary]=useState<Summary>({products:0,priced:0,stockDefined:0,orders:0});
-  const [products,setProducts]=useState<Product[]>([]); const [orders,setOrders]=useState<Order[]>([]);
-  const [query,setQuery]=useState(""); const [inventoryFilter,setInventoryFilter]=useState<InventoryFilter>("all"); const [loading,setLoading]=useState(true); const [syncing,setSyncing]=useState(false); const [message,setMessage]=useState("");
-  const loadProducts=async(q="",status:InventoryFilter=inventoryFilter)=>{setLoading(true);const r=await fetch(`/api/admin/catalog?q=${encodeURIComponent(q)}&status=${status}`);if(r.ok){const d=await r.json() as {products:Product[];summary:Summary};setProducts(d.products);setSummary(d.summary)}setLoading(false)};
-  const loadOrders=async()=>{setLoading(true);const r=await fetch("/api/admin/orders");if(r.ok){const d=await r.json() as {orders:Order[]};setOrders(d.orders)}setLoading(false)};
-  useEffect(()=>{loadProducts()},[]);
-  const changeTab=(next:Tab)=>{setTab(next);setMessage("");if(next==="orders")loadOrders();else loadProducts(query)};
-  const sync=async()=>{setSyncing(true);setMessage("");const r=await fetch("/api/admin/catalog/sync",{method:"POST"});const d=await r.json() as {imported?:number;error?:string};setMessage(r.ok?`${(d.imported??0).toLocaleString("pt-BR")} produtos sincronizados.`:d.error||"Falha ao sincronizar.");setSyncing(false);if(r.ok)loadProducts()};
-  const save=async(p:Product)=>{const r=await fetch(`/api/admin/catalog/${encodeURIComponent(p.code)}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({priceCents:p.priceCents,stockQuantity:p.stockQuantity,imageUrl:p.imageUrl,active:p.active})});const result=await r.json().catch(()=>({})) as {error?:string};setMessage(r.ok?`${p.code} atualizado.`:result.error||"Não foi possível salvar.");if(r.ok)loadProducts(query)};
-  const updateStatus=async(order:Order,status:string)=>{const r=await fetch(`/api/admin/orders/${encodeURIComponent(order.id)}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({status})});setMessage(r.ok?`Pedido ${order.id} atualizado.`:"Não foi possível atualizar o pedido.");if(r.ok)setOrders(orders.map(o=>o.id===order.id?{...o,status}:o))};
-  return <main className="real-admin"><aside><img src="/highparts-logo.png" alt="HighParts"/><small>ADMINISTRAÇÃO</small><nav><button className={tab==="inventory"?"active":""} onClick={()=>changeTab("inventory")}><Boxes/> Estoque</button><button className={tab==="orders"?"active":""} onClick={()=>changeTab("orders")}><ShoppingBag/> Pedidos {summary.orders>0&&<b>{summary.orders}</b>}</button></nav><div className="admin-user"><ShieldCheck/><span><b>Administrador</b><small>{adminEmail}</small></span></div><a href="/"><ChevronLeft/> Voltar para a loja</a></aside><section><header><div><small>{tab==="inventory"?"CATÁLOGO HIGHPARTS":"VENDAS HIGHPARTS"}</small><h1>{tab==="inventory"?"Produtos e estoque":"Pedidos recebidos"}</h1><p>{tab==="inventory"?"Informe preço, saldo e imagem para liberar cada produto na loja.":"Consulte clientes, valores e atualize o andamento de cada venda."}</p></div>{tab==="inventory"&&<button onClick={sync} disabled={syncing}>{syncing?<LoaderCircle className="spin"/>:<RefreshCw/>}{syncing?"Sincronizando...":"Sincronizar planilha"}</button>}</header>{message&&<div className="admin-message"><Check/>{message}</div>}<div className="admin-summary"><Card icon={<Database/>} label="Produtos importados" value={summary.products}/><Card icon={<PackageSearch/>} label="Com preço" value={summary.priced}/><Card icon={<Boxes/>} label="Com saldo informado" value={summary.stockDefined}/><Card icon={<ShoppingBag/>} label="Pedidos" value={summary.orders}/></div>{tab==="inventory"?<Inventory products={products} query={query} filter={inventoryFilter} loading={loading} setQuery={setQuery} setFilter={next=>{setInventoryFilter(next);loadProducts(query,next)}} setProducts={setProducts} search={()=>loadProducts(query)} save={save}/>:<Orders orders={orders} loading={loading} updateStatus={updateStatus}/>}</section></main>;
+export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
+  const [tab, setTab] = useState<Tab>("inventory");
+  const [summary, setSummary] = useState<Summary>({
+    products: 0,
+    priced: 0,
+    stockDefined: 0,
+    orders: 0,
+  });
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [query, setQuery] = useState("");
+  const [inventoryFilter, setInventoryFilter] =
+    useState<InventoryFilter>("all");
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
+  const [message, setMessage] = useState("");
+  const loadProducts = async (
+    q = "",
+    status: InventoryFilter = inventoryFilter,
+  ) => {
+    setLoading(true);
+    const r = await fetch(
+      `/api/admin/catalog?q=${encodeURIComponent(q)}&status=${status}`,
+    );
+    if (r.ok) {
+      const d = (await r.json()) as { products: Product[]; summary: Summary };
+      setProducts(d.products);
+      setSummary(d.summary);
+    }
+    setLoading(false);
+  };
+  const loadOrders = async () => {
+    setLoading(true);
+    const r = await fetch("/api/admin/orders");
+    if (r.ok) {
+      const d = (await r.json()) as { orders: Order[] };
+      setOrders(d.orders);
+    }
+    setLoading(false);
+  };
+  useEffect(() => {
+    loadProducts();
+  }, []);
+  const changeTab = (next: Tab) => {
+    setTab(next);
+    setMessage("");
+    if (next === "orders") loadOrders();
+    else loadProducts(query);
+  };
+  const sync = async () => {
+    setSyncing(true);
+    setMessage("");
+    const r = await fetch("/api/admin/catalog/sync", { method: "POST" });
+    const d = (await r.json()) as { imported?: number; error?: string };
+    setMessage(
+      r.ok
+        ? `${(d.imported ?? 0).toLocaleString("pt-BR")} produtos sincronizados.`
+        : d.error || "Falha ao sincronizar.",
+    );
+    setSyncing(false);
+    if (r.ok) loadProducts();
+  };
+  const save = async (p: Product) => {
+    const r = await fetch(`/api/admin/catalog/${encodeURIComponent(p.code)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        priceCents: p.priceCents,
+        stockQuantity: p.stockQuantity,
+        imageUrl: p.imageUrl,
+        active: p.active,
+      }),
+    });
+    const result = (await r.json().catch(() => ({}))) as { error?: string };
+    setMessage(
+      r.ok
+        ? `${p.code} atualizado.`
+        : result.error || "Não foi possível salvar.",
+    );
+    if (r.ok) loadProducts(query);
+  };
+  const updateStatus = async (order: Order, status: string) => {
+    const r = await fetch(`/api/admin/orders/${encodeURIComponent(order.id)}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setMessage(
+      r.ok
+        ? `Pedido ${order.id} atualizado.`
+        : "Não foi possível atualizar o pedido.",
+    );
+    if (r.ok)
+      setOrders(orders.map((o) => (o.id === order.id ? { ...o, status } : o)));
+  };
+  return (
+    <main className="real-admin">
+      <aside>
+        <img src="/highparts-logo.png" alt="HighParts" />
+        <small>ADMINISTRAÇÃO</small>
+        <nav>
+          <button
+            className={tab === "inventory" ? "active" : ""}
+            onClick={() => changeTab("inventory")}
+          >
+            <Boxes /> Estoque
+          </button>
+          <button
+            className={tab === "orders" ? "active" : ""}
+            onClick={() => changeTab("orders")}
+          >
+            <ShoppingBag /> Pedidos{" "}
+            {summary.orders > 0 && <b>{summary.orders}</b>}
+          </button>
+        </nav>
+        <div className="admin-user">
+          <ShieldCheck />
+          <span>
+            <b>Administrador</b>
+            <small>{adminEmail}</small>
+          </span>
+        </div>
+        <a href="/">
+          <ChevronLeft /> Voltar para a loja
+        </a>
+      </aside>
+      <section>
+        <header>
+          <div>
+            <small>
+              {tab === "inventory" ? "CATÁLOGO HIGHPARTS" : "VENDAS HIGHPARTS"}
+            </small>
+            <h1>
+              {tab === "inventory" ? "Produtos e estoque" : "Pedidos recebidos"}
+            </h1>
+            <p>
+              {tab === "inventory"
+                ? "Informe preço, saldo e imagem para liberar cada produto na loja."
+                : "Consulte clientes, valores e atualize o andamento de cada venda."}
+            </p>
+          </div>
+          {tab === "inventory" && (
+            <button onClick={sync} disabled={syncing}>
+              {syncing ? <LoaderCircle className="spin" /> : <RefreshCw />}
+              {syncing ? "Sincronizando..." : "Sincronizar planilha"}
+            </button>
+          )}
+        </header>
+        {message && (
+          <div className="admin-message">
+            <Check />
+            {message}
+          </div>
+        )}
+        <div className="admin-summary">
+          <Card
+            icon={<Database />}
+            label="Produtos importados"
+            value={summary.products}
+          />
+          <Card
+            icon={<PackageSearch />}
+            label="Com preço"
+            value={summary.priced}
+          />
+          <Card
+            icon={<Boxes />}
+            label="Com saldo informado"
+            value={summary.stockDefined}
+          />
+          <Card icon={<ShoppingBag />} label="Pedidos" value={summary.orders} />
+        </div>
+        {tab === "inventory" ? (
+          <Inventory
+            products={products}
+            query={query}
+            filter={inventoryFilter}
+            loading={loading}
+            setQuery={setQuery}
+            setFilter={(next) => {
+              setInventoryFilter(next);
+              loadProducts(query, next);
+            }}
+            setProducts={setProducts}
+            search={() => loadProducts(query)}
+            save={save}
+          />
+        ) : (
+          <Orders
+            orders={orders}
+            loading={loading}
+            updateStatus={updateStatus}
+          />
+        )}
+      </section>
+    </main>
+  );
 }
 
-function Card({icon,label,value}:{icon:React.ReactNode;label:string;value:number}){return <article>{icon}<span><small>{label}</small><b>{value.toLocaleString("pt-BR")}</b></span></article>}
-function Inventory({products,query,filter,loading,setQuery,setFilter,setProducts,search,save}:{products:Product[];query:string;filter:InventoryFilter;loading:boolean;setQuery:(q:string)=>void;setFilter:(filter:InventoryFilter)=>void;setProducts:(p:Product[])=>void;search:()=>void;save:(p:Product)=>void}){return <div className="inventory"><div className="inventory-filters"><button className={filter==="all"?"active":""} onClick={()=>setFilter("all")}>Todos</button><button className={filter==="missing-price"?"active":""} onClick={()=>setFilter("missing-price")}>Sem preço</button><button className={filter==="missing-stock"?"active":""} onClick={()=>setFilter("missing-stock")}>Sem estoque</button><button className={filter==="ready"?"active":""} onClick={()=>setFilter("ready")}>Prontos para venda</button></div><div className="inventory-head"><div className="admin-search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&search()} placeholder="Buscar código, produto ou aplicação"/><button onClick={search}>Buscar</button></div><span>{products.length} resultados nesta página</span></div>{loading?<Loading/>:products.length?<div className="inventory-table"><table><thead><tr><th>Código</th><th>Produto e aplicação</th><th>Preço</th><th>Estoque</th><th>Imagem</th><th>Ativo</th><th></th></tr></thead><tbody>{products.map((p,i)=><ProductRow key={p.code} product={p} onChange={next=>setProducts(products.map((x,n)=>n===i?next:x))} onSave={()=>save(p)}/>)}</tbody></table></div>:<div className="admin-empty"><Database/><h2>Nenhum produto encontrado</h2><p>Altere a busca ou selecione outro filtro.</p></div>}</div>}
-function Orders({orders,loading,updateStatus}:{orders:Order[];loading:boolean;updateStatus:(order:Order,status:string)=>void}){return <div className="inventory admin-orders">{loading?<Loading/>:orders.length?<div className="inventory-table"><table><thead><tr><th>Pedido</th><th>Cliente</th><th>Itens</th><th>Total</th><th>Data</th><th>Status</th></tr></thead><tbody>{orders.map(order=><tr key={order.id}><td><b>{order.id}</b><small>{order.paymentProvider}</small></td><td><b>{order.customerName}</b><small>{order.customerEmail}<br/>{order.customerPhone}</small></td><td>{order.itemCount}</td><td><b>{money(order.totalCents)}</b></td><td>{new Date(order.createdAt.replace(" ","T")+"Z").toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}</td><td><select value={order.status} onChange={e=>updateStatus(order,e.target.value)}>{Object.entries(statusLabels).map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></td></tr>)}</tbody></table></div>:<div className="admin-empty"><ShoppingBag/><h2>Nenhum pedido ainda</h2><p>Os pedidos criados no checkout aparecerão aqui.</p></div>}</div>}
-function Loading(){return <div className="admin-loading"><LoaderCircle className="spin"/>Carregando...</div>}
-function ProductRow({product:p,onChange,onSave}:{product:Product;onChange:(p:Product)=>void;onSave:()=>void}){return <tr><td><b>{p.code}</b><small>{p.axle}</small></td><td><b>{p.product}</b><small>{p.application.slice(0,135)}{p.application.length>135?"…":""}</small></td><td><label>R$<input type="number" min="0" step="0.01" value={p.priceCents==null?"":(p.priceCents/100).toFixed(2)} onChange={e=>onChange({...p,priceCents:e.target.value===""?null:Math.round(Number(e.target.value)*100)})}/></label></td><td><input className="stock-input" type="number" min="0" value={p.stockQuantity??""} placeholder="—" onChange={e=>onChange({...p,stockQuantity:e.target.value===""?null:Number(e.target.value)})}/></td><td><input className="image-input" type="url" value={p.imageUrl??""} placeholder="https://..." aria-label={`Imagem de ${p.code}`} onChange={e=>onChange({...p,imageUrl:e.target.value||null})}/></td><td><button className={`toggle ${p.active?"on":""}`} onClick={()=>onChange({...p,active:!p.active})}><i/></button></td><td><button className="save-product" onClick={onSave}><Save/> Salvar</button></td></tr>}
+function Card({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number;
+}) {
+  return (
+    <article>
+      {icon}
+      <span>
+        <small>{label}</small>
+        <b>{value.toLocaleString("pt-BR")}</b>
+      </span>
+    </article>
+  );
+}
+function Inventory({
+  products,
+  query,
+  filter,
+  loading,
+  setQuery,
+  setFilter,
+  setProducts,
+  search,
+  save,
+}: {
+  products: Product[];
+  query: string;
+  filter: InventoryFilter;
+  loading: boolean;
+  setQuery: (q: string) => void;
+  setFilter: (filter: InventoryFilter) => void;
+  setProducts: (p: Product[]) => void;
+  search: () => void;
+  save: (p: Product) => void;
+}) {
+  return (
+    <div className="inventory">
+      <div className="inventory-filters">
+        <button
+          className={filter === "all" ? "active" : ""}
+          onClick={() => setFilter("all")}
+        >
+          Todos
+        </button>
+        <button
+          className={filter === "missing-price" ? "active" : ""}
+          onClick={() => setFilter("missing-price")}
+        >
+          Sem preço
+        </button>
+        <button
+          className={filter === "missing-stock" ? "active" : ""}
+          onClick={() => setFilter("missing-stock")}
+        >
+          Sem estoque
+        </button>
+        <button
+          className={filter === "ready" ? "active" : ""}
+          onClick={() => setFilter("ready")}
+        >
+          Prontos para venda
+        </button>
+      </div>
+      <div className="inventory-head">
+        <div className="admin-search">
+          <Search />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && search()}
+            placeholder="Buscar código, produto ou aplicação"
+          />
+          <button onClick={search}>Buscar</button>
+        </div>
+        <span>{products.length} resultados nesta página</span>
+      </div>
+      {loading ? (
+        <Loading />
+      ) : products.length ? (
+        <div className="inventory-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Produto e aplicação</th>
+                <th>Preço</th>
+                <th>Estoque</th>
+                <th>Imagem</th>
+                <th>Ativo</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((p, i) => (
+                <ProductRow
+                  key={p.code}
+                  product={p}
+                  onChange={(next) =>
+                    setProducts(products.map((x, n) => (n === i ? next : x)))
+                  }
+                  onSave={() => save(p)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="admin-empty">
+          <Database />
+          <h2>Nenhum produto encontrado</h2>
+          <p>Altere a busca ou selecione outro filtro.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+function Orders({
+  orders,
+  loading,
+  updateStatus,
+}: {
+  orders: Order[];
+  loading: boolean;
+  updateStatus: (order: Order, status: string) => void;
+}) {
+  return (
+    <div className="inventory admin-orders">
+      {loading ? (
+        <Loading />
+      ) : orders.length ? (
+        <div className="inventory-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Pedido</th>
+                <th>Cliente</th>
+                <th>Itens</th>
+                <th>Total</th>
+                <th>Data</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((order) => (
+                <tr key={order.id}>
+                  <td>
+                    <b>{order.id}</b>
+                    <small>{order.paymentProvider}</small>
+                  </td>
+                  <td>
+                    <b>{order.customerName}</b>
+                    <small>
+                      {order.customerEmail}
+                      <br />
+                      {order.customerPhone}
+                    </small>
+                  </td>
+                  <td>{order.itemCount}</td>
+                  <td>
+                    <b>{money(order.totalCents)}</b>
+                  </td>
+                  <td>
+                    {new Date(
+                      order.createdAt.replace(" ", "T") + "Z",
+                    ).toLocaleString("pt-BR", {
+                      dateStyle: "short",
+                      timeStyle: "short",
+                    })}
+                  </td>
+                  <td>
+                    <select
+                      value={order.status}
+                      onChange={(e) => updateStatus(order, e.target.value)}
+                    >
+                      {Object.entries(statusLabels).map(([value, label]) => (
+                        <option value={value} key={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="admin-empty">
+          <ShoppingBag />
+          <h2>Nenhum pedido ainda</h2>
+          <p>Os pedidos criados no checkout aparecerão aqui.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+function Loading() {
+  return (
+    <div className="admin-loading">
+      <LoaderCircle className="spin" />
+      Carregando...
+    </div>
+  );
+}
+function ProductRow({
+  product: p,
+  onChange,
+  onSave,
+}: {
+  product: Product;
+  onChange: (p: Product) => void;
+  onSave: () => void;
+}) {
+  return (
+    <tr>
+      <td>
+        <b>{p.code}</b>
+        <small>{p.axle}</small>
+      </td>
+      <td>
+        <b>{p.product}</b>
+        <small>
+          {p.application.slice(0, 135)}
+          {p.application.length > 135 ? "…" : ""}
+        </small>
+      </td>
+      <td>
+        <label>
+          R$
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={p.priceCents == null ? "" : (p.priceCents / 100).toFixed(2)}
+            onChange={(e) =>
+              onChange({
+                ...p,
+                priceCents:
+                  e.target.value === ""
+                    ? null
+                    : Math.round(Number(e.target.value) * 100),
+              })
+            }
+          />
+        </label>
+      </td>
+      <td>
+        <input
+          className="stock-input"
+          type="number"
+          min="0"
+          value={p.stockQuantity ?? ""}
+          placeholder="—"
+          onChange={(e) =>
+            onChange({
+              ...p,
+              stockQuantity:
+                e.target.value === "" ? null : Number(e.target.value),
+            })
+          }
+        />
+      </td>
+      <td>
+        <input
+          className="image-input"
+          type="url"
+          value={p.imageUrl ?? ""}
+          placeholder="https://..."
+          aria-label={`Imagem de ${p.code}`}
+          onChange={(e) => onChange({ ...p, imageUrl: e.target.value || null })}
+        />
+      </td>
+      <td>
+        <button
+          className={`toggle ${p.active ? "on" : ""}`}
+          onClick={() => onChange({ ...p, active: !p.active })}
+        >
+          <i />
+        </button>
+      </td>
+      <td>
+        <button className="save-product" onClick={onSave}>
+          <Save /> Salvar
+        </button>
+      </td>
+    </tr>
+  );
+}
