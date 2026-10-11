@@ -22,7 +22,7 @@ export default function StoreHeader({userName,cartCount=0,onCart,darkTopbar=true
         <a className="nav-root" href={group.href}>{group.label}<ChevronDown/></a>
         <div className="nav-panel">{group.panel}</div>
       </div>)}</nav>
-      <div className="header-actions"><a className="admin-link" href={userName?"/conta":"/entrar"}><CircleUserRound/> {userName?userName.split(" ")[0]:"Entrar"}</a><button className="cart-icon" aria-label={`Abrir carrinho com ${cartCount} itens`} onClick={onCart??(()=>window.location.assign("/"))}><ShoppingCart/><b>{cartCount}</b></button></div>
+      <div className="header-actions"><a className="admin-link" href={userName?"/conta":"/entrar"}><CircleUserRound/> {userName?userName.split(" ")[0]:"Entrar"}</a><button className="cart-icon" aria-label={`Abrir carrinho com ${cartCount} itens`} onClick={onCart??(()=>window.location.assign("/carrinho"))}><ShoppingCart/><b>{cartCount}</b></button></div>
     </header>
   </>;
 }

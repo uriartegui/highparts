@@ -91,7 +91,6 @@ export default function Home() {
         .catch(() => ({ products: [] }));
       const mapped = (catalog.products || []).map(mapProduct);
       if (mapped.length) setProducts(mapped);
-      const known = mapped.length ? mapped : initialProducts;
       const local = JSON.parse(
         localStorage.getItem("highparts_cart") || "[]",
       ) as string[];
@@ -111,24 +110,44 @@ export default function Home() {
         const remote = (saved.items || [])
           .flatMap((item) =>
             Array.from({ length: item.quantity }, () => String(item.itemKey)),
-          )
-          .filter((id: string) => known.some((p: Product) => p.id === id));
-        setCart(
-          remote.length
-            ? remote
-            : local.filter((id) => known.some((p: Product) => p.id === id)),
-        );
-      } else
-        setCart(local.filter((id) => known.some((p: Product) => p.id === id)));
+          );
+        const selected = remote.length ? remote : local;
+        await loadCartProducts(selected, mapped);
+        setCart(selected);
+      } else {
+        await loadCartProducts(local, mapped);
+        setCart(local);
+      }
       setCartReady(true);
+      if (new URLSearchParams(window.location.search).get("checkout") === "1")
+        setCheckout(true);
+
+      async function loadCartProducts(ids: string[], current: Product[]) {
+        const missing = [...new Set(ids)].filter(
+          (id) => !current.some((product) => product.id === id),
+        );
+        if (!missing.length) return;
+        const params = new URLSearchParams({
+          codes: missing.join(","),
+          limit: String(Math.min(100, missing.length)),
+        });
+        const extra = await fetch(`/api/catalog?${params}`)
+          .then((r) => r.json() as Promise<{ products?: ApiProduct[] }>)
+          .catch(() => ({ products: [] }));
+        const combined = [...current, ...(extra.products || []).map(mapProduct)];
+        setProducts(combined.filter((product, index, all) =>
+          all.findIndex((candidate) => candidate.id === product.id) === index,
+        ));
+      }
     })();
   }, []);
   useEffect(() => {
     if (!cartReady) return;
     localStorage.setItem("highparts_cart", JSON.stringify(cart));
     if (user) {
-      const grouped = [...new Set(cart)].map((id) => {
-        const p = products.find((product) => product.id === id)!;
+      const grouped = [...new Set(cart)].flatMap((id) => {
+        const p = products.find((product) => product.id === id);
+        if (!p) return [];
         return {
           itemKey: id,
           name: p.name,

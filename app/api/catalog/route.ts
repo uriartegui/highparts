@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 
-const MAX_LIMIT = 60;
+const MAX_LIMIT = 100;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -11,8 +11,18 @@ export async function GET(request: Request) {
   const category = (url.searchParams.get("category") ?? "").trim().slice(0, 80);
   const brand = (url.searchParams.get("brand") ?? "").trim().slice(0, 40);
   const axle = (url.searchParams.get("axle") ?? "").trim().slice(0, 40);
+  const codes = (url.searchParams.get("codes") ?? "")
+    .split(",")
+    .map((code) => code.trim())
+    .filter(Boolean)
+    .slice(0, MAX_LIMIT);
   const conditions = ["active=1"];
   const bindings: Array<string | number> = [];
+
+  if (codes.length) {
+    conditions.push(`code IN (${codes.map(() => "?").join(",")})`);
+    bindings.push(...codes);
+  }
 
   if (search) {
     conditions.push("(code LIKE ? OR product LIKE ? OR application LIKE ? OR type LIKE ?)");
