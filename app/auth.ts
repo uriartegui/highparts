@@ -29,8 +29,10 @@ export function isTrustedRequest(request: Request) {
 }
 
 export async function verifyTurnstile(request: Request, token?: string) {
-  const securityEnv = env as unknown as { TURNSTILE_SECRET_KEY?: string };
-  if (!securityEnv.TURNSTILE_SECRET_KEY) return true;
+  const securityEnv = env as unknown as { TURNSTILE_SECRET_KEY?: string; TURNSTILE_SITE_KEY?: string };
+  // Never require a challenge the browser cannot render. The rate limiter and
+  // password checks remain active until both Turnstile keys are configured.
+  if (!securityEnv.TURNSTILE_SECRET_KEY || !securityEnv.TURNSTILE_SITE_KEY) return true;
   if (new URL(request.url).hostname.endsWith(".workers.dev")) return true;
   if (!token) return false;
   const form = new FormData();
