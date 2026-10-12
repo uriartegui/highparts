@@ -128,7 +128,38 @@ export async function POST(request: Request) {
     (sum, item) => sum + item.product.priceCents * item.quantity,
     0,
   );
-  const id = `HP-${Date.now().toString(36).toUpperCase()}`;
+  // Random suffix: two checkouts in the same millisecond must not collide.
+  const id = `HP-${Date.now().toString(36).toUpperCase()}${crypto.getRandomValues(new Uint8Array(2)).reduce((code, byte) => code + byte.toString(36).toUpperCase().padStart(2, "0"), "")}`;
+  const text = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
+
+  // Reserve stock first. Each UPDATE only applies while enough stock remains,
+  // so concurrent checkouts for the last units cannot both succeed; if any line
+  // could not be reserved, give back what was taken and refuse the order.
+  const reservations = await env.DB.batch(
+    validItems.map((item) =>
+      env.DB.prepare(
+        "UPDATE products SET stock_quantity=stock_quantity-?,updated_at=CURRENT_TIMESTAMP WHERE code=? AND stock_quantity>=?",
+      ).bind(item.quantity, item.product.code, item.quantity),
+    ),
+  );
+  const reserved = validItems.filter((_, index) => (reservations[index]?.meta?.changes ?? 0) > 0);
+  const releaseStock = (items: typeof validItems) =>
+    items.length
+      ? env.DB.batch(items.map((item) =>
+          env.DB.prepare(
+            "UPDATE products SET stock_quantity=stock_quantity+?,updated_at=CURRENT_TIMESTAMP WHERE code=?",
+          ).bind(item.quantity, item.product.code),
+        ))
+      : Promise.resolve([]);
+  if (reserved.length !== validItems.length) {
+    await releaseStock(reserved);
+    const missing = validItems.find((item) => !reserved.includes(item))!;
+    return Response.json(
+      { error: `Estoque insuficiente para ${missing.product.code}.` },
+      { status: 409 },
+    );
+  }
+
   const statements = [
     env.DB.prepare(
       `INSERT INTO orders (id,user_id,customer_name,customer_email,customer_phone,postal_code,shipping_address,vehicle_plate,total_cents,status,payment_provider)
@@ -138,10 +169,10 @@ export async function POST(request: Request) {
       user.id,
       user.name,
       user.email,
-      input.phone ?? user.phone,
-      input.postalCode ?? "",
-      input.address ?? "",
-      input.vehiclePlate ?? "",
+      text(input.phone, 20) || user.phone,
+      text(input.postalCode, 9),
+      text(input.address, 300),
+      text(input.vehiclePlate, 8).toUpperCase(),
       total,
     ),
     ...validItems.map((item) =>
@@ -156,13 +187,13 @@ export async function POST(request: Request) {
         item.quantity,
       ),
     ),
-    ...validItems.map((item) =>
-      env.DB.prepare(
-        "UPDATE products SET stock_quantity=stock_quantity-?,updated_at=CURRENT_TIMESTAMP WHERE code=? AND stock_quantity>=?",
-      ).bind(item.quantity, item.product.code, item.quantity),
-    ),
   ];
-  await env.DB.batch(statements);
+  try {
+    await env.DB.batch(statements);
+  } catch (error) {
+    await releaseStock(validItems);
+    throw error;
+  }
   await env.DB.prepare("DELETE FROM saved_cart_items WHERE user_id=?")
     .bind(user.id)
     .run();

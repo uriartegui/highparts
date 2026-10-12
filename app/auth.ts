@@ -42,7 +42,8 @@ export async function verifyTurnstile(request: Request, token?: string) {
   const ip = request.headers.get("CF-Connecting-IP");
   if (ip) form.set("remoteip", ip);
   const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
-  const result = await response.json() as { success?: boolean };
+  const result = await response.json() as { success?: boolean; "error-codes"?: string[]; hostname?: string };
+  if (result.success !== true) console.warn("turnstile_rejected", JSON.stringify({ codes: result["error-codes"] ?? [], hostname: result.hostname ?? null }));
   return result.success === true;
 }
 

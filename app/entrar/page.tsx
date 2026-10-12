@@ -34,6 +34,7 @@ function LoginPageContent() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [turnstileToken,setTurnstileToken]=useState("");
   const onTurnstile=useCallback((token:string)=>setTurnstileToken(token),[]);
+  const [turnstileReset,setTurnstileReset]=useState(0);
 
   function changeMode(nextMode: "login" | "register") {
     setMode(nextMode); setError(""); setFieldErrors({}); setShowPassword(false); setShowConfirmation(false);
@@ -50,6 +51,7 @@ function LoginPageContent() {
       if (result.fieldErrors) setFieldErrors(result.fieldErrors);
       else if (result.field) setFieldErrors({ [result.field]: result.error });
       else setError(result.error ?? "Não foi possível continuar.");
+      setTurnstileReset(value => value + 1);
       setLoading(false); return;
     }
     const requested = params.get("returnTo");
@@ -64,7 +66,7 @@ function LoginPageContent() {
       <label className={fieldErrors.email ? "field-invalid" : ""}>E-mail<input name="email" type="email" required autoComplete="email" aria-invalid={!!fieldErrors.email} onChange={() => setFieldErrors(current => ({ ...current, email: "" }))} />{fieldErrors.email && <small className="field-error">{fieldErrors.email}</small>}</label>
       <label className={fieldErrors.password ? "field-invalid" : ""}>Senha<span className="password-field"><input name="password" type={showPassword ? "text" : "password"} minLength={mode === "register" ? 10 : 1} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!fieldErrors.password} onChange={() => setFieldErrors(current => ({ ...current, password: "" }))} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button></span>{mode === "register" && !fieldErrors.password && <small className="field-hint">Mínimo de 10 caracteres, com letra e número.</small>}{fieldErrors.password && <small className="field-error">{fieldErrors.password}</small>}</label>
       {mode === "register" && <label className={fieldErrors.confirmPassword ? "field-invalid" : ""}>Confirmar senha<span className="password-field"><input name="confirmPassword" type={showConfirmation ? "text" : "password"} required minLength={8} autoComplete="new-password" aria-invalid={!!fieldErrors.confirmPassword} onChange={() => setFieldErrors(current => ({ ...current, confirmPassword: "" }))} /><button type="button" onClick={() => setShowConfirmation(!showConfirmation)} aria-label={showConfirmation ? "Ocultar confirmação de senha" : "Mostrar confirmação de senha"}>{showConfirmation ? <EyeOff /> : <Eye />}</button></span>{fieldErrors.confirmPassword && <small className="field-error">{fieldErrors.confirmPassword}</small>}</label>}
-      {mode === "login" && <a className="forgot-link" href="/esqueci-senha">Esqueci minha senha</a>}<TurnstileWidget onToken={onTurnstile}/>{fieldErrors.turnstile&&<small className="field-error">{fieldErrors.turnstile}</small>}{error && <p className="auth-error">{error}</p>}<button className="auth-submit" disabled={loading}>{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar minha conta"}</button>
+      {mode === "login" && <a className="forgot-link" href="/esqueci-senha">Esqueci minha senha</a>}<TurnstileWidget onToken={onTurnstile} resetSignal={turnstileReset}/>{fieldErrors.turnstile&&<small className="field-error">{fieldErrors.turnstile}</small>}{error && <p className="auth-error">{error}</p>}<button className="auth-submit" disabled={loading}>{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar minha conta"}</button>
     </form><div className="auth-secure"><ShieldCheck /><span><b>Sessão protegida</b><small>Senha criptografada e cookie seguro.</small></span></div>
   </section></main>;
 }
