@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { createSession, hashPassword, hashToken, isTrustedRequest, recordSecurityEvent, verifyTurnstile } from "../../../auth";
-import { sendAuthEmail } from "../../../email";
+import { escapeHtml, sendAuthEmail } from "../../../email";
 
 function randomToken() { const bytes=crypto.getRandomValues(new Uint8Array(32)); return btoa(String.fromCharCode(...bytes)).replaceAll("+","-").replaceAll("/","_").replaceAll("=",""); }
 
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
   await env.DB.prepare("INSERT INTO email_verification_tokens (token_hash,user_id,expires_at) VALUES (?,?,?)")
     .bind(await hashToken(token), id, new Date(Date.now()+24*60*60_000).toISOString()).run();
   const verifyUrl = `${new URL(request.url).origin}/verificar-email?token=${encodeURIComponent(token)}`;
-  const delivery = await sendAuthEmail(email, "Confirme seu e-mail da HighParts", `<p>Olá, ${name}.</p><p>Confirme seu e-mail para proteger sua conta.</p><p><a href="${verifyUrl}">Confirmar meu e-mail</a></p><p>O link expira em 24 horas.</p>`);
+  const delivery = await sendAuthEmail(email, "Confirme seu e-mail da HighParts", `<p>Olá, ${escapeHtml(name)}.</p><p>Confirme seu e-mail para proteger sua conta.</p><p><a href="${verifyUrl}">Confirmar meu e-mail</a></p><p>O link expira em 24 horas.</p>`);
   await recordSecurityEvent("account_registered", email, id, { verificationEmailSent: delivery.sent });
   return Response.json({ user: { id, name, email, role }, verificationEmailSent: delivery.sent }, { status: 201 });
 }

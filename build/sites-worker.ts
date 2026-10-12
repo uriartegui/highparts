@@ -2,6 +2,28 @@ import handler from "vinext/server/fetch-handler";
 import { runWithConnectorBinding } from "../lib/connector-context";
 import type { ConnectorBinding } from "../lib/connector-contract.mjs";
 
+// Baseline hardening applied to every response. The CSP deliberately leaves
+// script-src open (hydration uses inline scripts, Turnstile loads remotely) and
+// focuses on clickjacking, base-tag hijacking, plugins and form exfiltration.
+const SECURITY_HEADERS: Record<string, string> = {
+  "Content-Security-Policy": "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
+  "X-Frame-Options": "DENY",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+  "Cross-Origin-Opener-Policy": "same-origin",
+};
+
+function withSecurityHeaders(response: Response) {
+  if (response.status === 101) return response;
+  const secured = new Response(response.body, response);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    if (!secured.headers.has(name)) secured.headers.set(name, value);
+  }
+  if (!import.meta.env.DEV) secured.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  return secured;
+}
+
 export default {
   fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
     let binding = ctx.props?.CONNECTORS;
@@ -23,6 +45,6 @@ export default {
         },
       };
     }
-    return runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx));
+    return Promise.resolve(runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx))).then(withSecurityHeaders);
   },
 };

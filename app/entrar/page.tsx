@@ -5,6 +5,18 @@ import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import TurnstileWidget from "../turnstile-widget";
 
+// Only same-origin paths are allowed; "/\evil.com" and "//evil.com" resolve to
+// other hosts in browsers, so validate the resolved origin instead of the prefix.
+function safeReturnPath(value: string | null) {
+  if (!value || !value.startsWith("/")) return "/";
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : "/";
+  } catch {
+    return "/";
+  }
+}
+
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 11);
   if (digits.length <= 2) return digits ? `(${digits}` : "";
@@ -41,7 +53,7 @@ export default function LoginPage() {
       setLoading(false); return;
     }
     const requested = params.get("returnTo");
-    window.location.href = requested?.startsWith("/") && !requested.startsWith("//") ? requested : "/";
+    window.location.href = safeReturnPath(requested);
   }
 
   return <main className="auth-page"><a href="/"><img src="/highparts-logo.png" alt="HighParts" /></a><section>
