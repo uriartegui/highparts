@@ -28,11 +28,14 @@ function withSecurityHeaders(response: Response) {
 // Browsers always send Origin (and Sec-Fetch-Site) on cross-origin writes, so
 // a mismatch means another site is driving the user's session. Requests with
 // no Origin (curl, server-to-server) can't ride on browser cookies and pass;
-// provider webhooks under /api/payments/ authenticate with their signature.
+// the only exemption is the exact Mercado Pago webhook path, which is called
+// server-to-server and authenticates with its HMAC signature.
+const CSRF_EXEMPT_PATHS = new Set(["/api/payments/mercado-pago/webhook"]);
+
 function isCrossSiteWrite(request: Request) {
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return false;
   const url = new URL(request.url);
-  if (!url.pathname.startsWith("/api/") || url.pathname.startsWith("/api/payments/")) return false;
+  if (!url.pathname.startsWith("/api/") || CSRF_EXEMPT_PATHS.has(url.pathname)) return false;
   const origin = request.headers.get("origin");
   if (origin && origin !== url.origin) return true;
   return request.headers.get("sec-fetch-site") === "cross-site";
