@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent,useEffect,useState } from "react";
-import { Car,CheckCircle2,LoaderCircle,LogOut,MailWarning,MapPin,Package,Plus,ShoppingCart,Trash2 } from "lucide-react";
+import { Car,LayoutDashboard,LoaderCircle,LogOut,MailWarning,MapPin,Package,Plus,ShieldCheck,ShoppingCart,Trash2 } from "lucide-react";
 
 type User={id:string;name:string;email:string;role:string;phone:string;emailVerifiedAt:string|null};
 type Vehicle={id:string;plate:string;brand:string;model:string;year:string;version:string;hasAbs:number|null;nickname:string};
@@ -18,10 +18,12 @@ export default function AccountDashboard({user}:{user:User}){
   const [message,setMessage]=useState("");
   const [sending,setSending]=useState(false);
   const [showAddress,setShowAddress]=useState(false);
+  const [activeSection,setActiveSection]=useState("vehicles");
   const [lookingUpCep,setLookingUpCep]=useState(false);
   const [addressDraft,setAddressDraft]=useState({postalCode:"",street:"",neighborhood:"",city:"",state:""});
   const load=async()=>{const [v,o,a]=await Promise.all([fetch("/api/account/vehicles").then(r=>r.json()),fetch("/api/account/orders").then(r=>r.json()),fetch("/api/account/addresses").then(r=>r.json())]);setVehicles(v.vehicles??[]);setOrders(o.orders??[]);setAddresses(a.addresses??[])};
   useEffect(()=>{load()},[]);
+  useEffect(()=>{const root=document.querySelector(".account>section");const sections=["vehicles","addresses","orders"].map(id=>document.getElementById(id)).filter(Boolean) as HTMLElement[];const observer=new IntersectionObserver(entries=>{const visible=entries.filter(entry=>entry.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];if(visible)setActiveSection(visible.target.id)},{root,rootMargin:"-18% 0px -52%",threshold:[0,.15,.35,.6]});sections.forEach(section=>observer.observe(section));return()=>observer.disconnect()},[]);
   async function resend(){setSending(true);const r=await fetch("/api/auth/resend-verification",{method:"POST"});const d=await r.json();setMessage(r.ok?"E-mail de confirmação enviado. Verifique também a caixa de spam.":d.error);setSending(false)}
   async function addVehicle(e:FormEvent<HTMLFormElement>){e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget));const r=await fetch("/api/account/vehicles",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();setMessage(r.ok?"Veículo salvo na sua garagem.":d.error);if(r.ok){e.currentTarget.reset();setShowVehicle(false);load()}}
   async function removeVehicle(id:string){await fetch(`/api/account/vehicles/${id}`,{method:"DELETE"});load()}
@@ -29,7 +31,7 @@ export default function AccountDashboard({user}:{user:User}){
   async function addAddress(e:FormEvent<HTMLFormElement>){e.preventDefault();const body={...Object.fromEntries(new FormData(e.currentTarget)),...addressDraft};const r=await fetch("/api/account/addresses",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const d=await r.json();setMessage(r.ok?"Endereço salvo.":d.error);if(r.ok){e.currentTarget.reset();setAddressDraft({postalCode:"",street:"",neighborhood:"",city:"",state:""});setShowAddress(false);load()}}
   async function removeAddress(id:string){await fetch(`/api/account/addresses/${id}`,{method:"DELETE"});load()}
   async function logout(){await fetch("/api/auth/logout",{method:"POST"});location.href="/"}
-  return <main className="account"><aside><img src="/highparts-logo.png" alt="HighParts"/><nav><a href="#vehicles"><Car/> Meus veículos</a><a href="#addresses"><MapPin/> Endereços</a><a href="#orders"><Package/> Pedidos</a><a href="/"><ShoppingCart/> Continuar comprando</a>{user.role==="admin"&&<><a href="/admin">Painel administrativo</a><a href="/admin/seguranca">Segurança e acessos</a></>}</nav><button onClick={logout}><LogOut/> Sair</button></aside><section>
+  return <main className="account"><aside><img src="/highparts-logo.png" alt="HighParts"/><nav><span className="account-nav-label">CONTA</span><a className={activeSection==="vehicles"?"active":""} href="#vehicles" onClick={()=>setActiveSection("vehicles")}><Car/> Meus veículos</a><a className={activeSection==="addresses"?"active":""} href="#addresses" onClick={()=>setActiveSection("addresses")}><MapPin/> Endereços</a><a className={activeSection==="orders"?"active":""} href="#orders" onClick={()=>setActiveSection("orders")}><Package/> Pedidos</a><a href="/"><ShoppingCart/> Continuar comprando</a>{user.role==="admin"&&<><span className="account-nav-label admin-label">ADMINISTRAÇÃO</span><a href="/admin"><LayoutDashboard/> Painel administrativo</a><a href="/admin/seguranca"><ShieldCheck/> Segurança e acessos</a></>}</nav><div className="account-sidebar-user"><i>{user.name.trim().charAt(0).toUpperCase()}</i><span><b>{user.name}</b><small>{user.email}</small></span></div><button onClick={logout}><LogOut/> Sair</button></aside><section>
     <header><small>MINHA CONTA</small><h1>Olá, {user.name.split(" ")[0]}.</h1><p>{user.email}</p></header>
     {!user.emailVerifiedAt&&<div className="verification-alert"><MailWarning/><span><b>Confirme seu e-mail</b><small>A confirmação será exigida antes de finalizar uma compra.</small></span><button onClick={resend} disabled={sending}>{sending?"Enviando...":"Reenviar confirmação"}</button></div>}
     {message&&<div className="account-message">{message}</div>}
