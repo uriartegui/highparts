@@ -7,6 +7,7 @@ import {
   Check,
   ChevronLeft,
   Database,
+  Download,
   ClipboardCheck,
   LoaderCircle,
   MapPin,
@@ -364,25 +365,30 @@ function Card({
 }
 
 function Finance({ orders, loading }: { orders: Order[]; loading: boolean }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [dateFrom, setDateFrom] = useState(() => `${today.slice(0, 8)}01`);
+  const [dateTo, setDateTo] = useState(today);
   if (loading) return <Loading />;
+  const periodOrders = orders.filter((order) => {
+    const date = new Date(order.createdAt.replace(" ", "T") + "Z")
+      .toISOString()
+      .slice(0, 10);
+    return (!dateFrom || date >= dateFrom) && (!dateTo || date <= dateTo);
+  });
   const confirmedStatuses = new Set([
     "paid",
     "processing",
     "shipped",
     "delivered",
   ]);
-  const confirmed = orders.filter((order) =>
+  const confirmed = periodOrders.filter((order) =>
     confirmedStatuses.has(order.status),
   );
   const revenue = confirmed.reduce((sum, order) => sum + order.totalCents, 0);
   const average = confirmed.length ? Math.round(revenue / confirmed.length) : 0;
-  const awaiting = orders
+  const awaiting = periodOrders
     .filter((order) => order.status === "awaiting_payment")
     .reduce((sum, order) => sum + order.totalCents, 0);
-  const last30 = confirmed.filter((order) => {
-    const created = new Date(order.createdAt.replace(" ", "T") + "Z");
-    return Date.now() - created.getTime() <= 30 * 24 * 60 * 60 * 1000;
-  });
   const products = new Map<
     string,
     { code: string; name: string; quantity: number; revenue: number }
@@ -406,24 +412,95 @@ function Finance({ orders, loading }: { orders: Order[]; loading: boolean }) {
   const statusData = Object.entries(statusLabels).map(([status, label]) => ({
     status,
     label,
-    count: orders.filter((order) => order.status === status).length,
+    count: periodOrders.filter((order) => order.status === status).length,
   }));
   const maxStatus = Math.max(1, ...statusData.map((item) => item.count));
+  const exportCsv = () => {
+    const cell = (value: unknown) =>
+      `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const rows = periodOrders.map((order) => [
+      order.id,
+      new Date(order.createdAt.replace(" ", "T") + "Z").toLocaleString("pt-BR"),
+      order.customerName,
+      order.customerEmail,
+      order.customerPhone,
+      statusLabels[order.status] || order.status,
+      (order.totalCents / 100).toFixed(2).replace(".", ","),
+      order.paymentProvider,
+      order.shippingCarrier,
+      order.trackingCode,
+      (order.items || [])
+        .map((item) => `${item.itemKey} - ${item.name} (${item.quantity}x)`)
+        .join(" | "),
+    ]);
+    const headers = [
+      "Pedido",
+      "Data",
+      "Cliente",
+      "E-mail",
+      "Telefone",
+      "Status",
+      "Total (R$)",
+      "Pagamento",
+      "Transportadora",
+      "Rastreio",
+      "Itens",
+    ];
+    const csv = [headers, ...rows]
+      .map((row) => row.map(cell).join(";"))
+      .join("\r\n");
+    const url = URL.createObjectURL(
+      new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `highparts-vendas-${dateFrom || "inicio"}-${dateTo || "hoje"}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
   return (
     <div className="finance-dashboard">
+      <section className="finance-toolbar">
+        <div>
+          <label>
+            Data inicial
+            <input
+              type="date"
+              value={dateFrom}
+              max={dateTo || today}
+              onChange={(event) => setDateFrom(event.target.value)}
+            />
+          </label>
+          <label>
+            Data final
+            <input
+              type="date"
+              value={dateTo}
+              min={dateFrom}
+              max={today}
+              onChange={(event) => setDateTo(event.target.value)}
+            />
+          </label>
+        </div>
+        <span>
+          {periodOrders.length}{" "}
+          {periodOrders.length === 1 ? "pedido" : "pedidos"} no período
+        </span>
+        <button onClick={exportCsv} disabled={!periodOrders.length}>
+          <Download /> Exportar CSV
+        </button>
+      </section>
       <section className="finance-kpis">
         <FinanceCard
-          label="Faturamento confirmado"
+          label="Faturamento no período"
           value={money(revenue)}
           detail={`${confirmed.length} pedidos pagos`}
           icon={<TrendingUp />}
         />
         <FinanceCard
-          label="Últimos 30 dias"
-          value={money(
-            last30.reduce((sum, order) => sum + order.totalCents, 0),
-          )}
-          detail={`${last30.length} pedidos no período`}
+          label="Pedidos confirmados"
+          value={confirmed.length.toLocaleString("pt-BR")}
+          detail="Pagos, separados, enviados ou entregues"
           icon={<BarChart3 />}
         />
         <FinanceCard
@@ -435,7 +512,7 @@ function Finance({ orders, loading }: { orders: Order[]; loading: boolean }) {
         <FinanceCard
           label="Aguardando pagamento"
           value={money(awaiting)}
-          detail={`${orders.filter((order) => order.status === "awaiting_payment").length} pedidos pendentes`}
+          detail={`${periodOrders.filter((order) => order.status === "awaiting_payment").length} pedidos pendentes`}
           icon={<ClipboardCheck />}
         />
       </section>
@@ -446,7 +523,7 @@ function Finance({ orders, loading }: { orders: Order[]; loading: boolean }) {
               <small>OPERAÇÃO</small>
               <h2>Pedidos por etapa</h2>
             </span>
-            <b>{orders.length} pedidos</b>
+            <b>{periodOrders.length} pedidos</b>
           </header>
           <div>
             {statusData.map((item) => (
