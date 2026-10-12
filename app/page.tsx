@@ -87,6 +87,7 @@ export default function Home() {
   const [cartReady, setCartReady] = useState(false);
   const [heroQuery, setHeroQuery] = useState("");
   const [heroSuggestions, setHeroSuggestions] = useState<ApiProduct[]>([]);
+  const [heroSearchActive, setHeroSearchActive] = useState(false);
   useEffect(() => {
     (async () => {
       const catalog = await fetch("/api/catalog?limit=60")
@@ -201,7 +202,11 @@ export default function Home() {
       />
     );
   return (
-    <main>
+    <main
+      className={
+        heroSearchActive && heroSuggestions.length ? "search-suggesting" : ""
+      }
+    >
       <StoreHeader
         userName={user?.name}
         cartCount={cart.length}
@@ -221,7 +226,16 @@ export default function Home() {
             Catálogo técnico, busca orientada pelo seu veículo e uma experiência
             de compra criada para transmitir confiança.
           </p>
-          <form className="hero-search" action="/catalogo" method="get">
+          <form
+            className="hero-search"
+            action="/catalogo"
+            method="get"
+            onFocus={() => setHeroSearchActive(true)}
+            onBlur={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node))
+                setHeroSearchActive(false);
+            }}
+          >
             <Search aria-hidden="true" />
             <input
               type="search"
@@ -236,7 +250,7 @@ export default function Home() {
             <button type="submit">
               Buscar peça <ChevronRight />
             </button>
-            {heroSuggestions.length > 0 && (
+            {heroSearchActive && heroSuggestions.length > 0 && (
               <div className="hero-suggestions">
                 <small>SUGESTÕES DO CATÁLOGO</small>
                 {heroSuggestions.map((product) => (
