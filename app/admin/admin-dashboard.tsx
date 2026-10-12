@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import {
+  BarChart3,
   Boxes,
   Check,
   ChevronLeft,
@@ -16,6 +17,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Truck,
+  TrendingUp,
 } from "lucide-react";
 
 type Product = {
@@ -58,7 +60,7 @@ type Order = {
     packed: number;
   }>;
 };
-type Tab = "inventory" | "orders";
+type Tab = "inventory" | "orders" | "finance";
 type InventoryFilter = "all" | "missing-price" | "missing-stock" | "ready";
 const statusLabels: Record<string, string> = {
   awaiting_payment: "Aguardando pagamento",
@@ -128,7 +130,7 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
   const changeTab = (next: Tab) => {
     setTab(next);
     setMessage("");
-    if (next === "orders") loadOrders();
+    if (next === "orders" || next === "finance") loadOrders();
     else loadProducts(query);
   };
   const sync = async () => {
@@ -209,6 +211,12 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
             <ShoppingBag /> Pedidos{" "}
             {summary.orders > 0 && <b>{summary.orders}</b>}
           </button>
+          <button
+            className={tab === "finance" ? "active" : ""}
+            onClick={() => changeTab("finance")}
+          >
+            <BarChart3 /> Financeiro
+          </button>
         </nav>
         <div className="admin-user">
           <ShieldCheck />
@@ -225,15 +233,25 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
         <header>
           <div>
             <small>
-              {tab === "inventory" ? "CATÁLOGO HIGHPARTS" : "VENDAS HIGHPARTS"}
+              {tab === "inventory"
+                ? "CATÁLOGO HIGHPARTS"
+                : tab === "orders"
+                  ? "VENDAS HIGHPARTS"
+                  : "DESEMPENHO HIGHPARTS"}
             </small>
             <h1>
-              {tab === "inventory" ? "Produtos e estoque" : "Pedidos recebidos"}
+              {tab === "inventory"
+                ? "Produtos e estoque"
+                : tab === "orders"
+                  ? "Pedidos recebidos"
+                  : "Visão financeira"}
             </h1>
             <p>
               {tab === "inventory"
                 ? "Informe preço, saldo e imagem para liberar cada produto na loja."
-                : "Consulte clientes, valores e atualize o andamento de cada venda."}
+                : tab === "orders"
+                  ? "Consulte clientes, valores e atualize o andamento de cada venda."
+                  : "Acompanhe vendas confirmadas, ticket médio e produtos com maior saída."}
             </p>
           </div>
           {tab === "inventory" && (
@@ -249,55 +267,57 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
             {message}
           </div>
         )}
-        <div className="admin-summary">
-          {tab === "inventory" ? (
-            <>
-              <Card
-                icon={<Database />}
-                label="Produtos importados"
-                value={summary.products}
-              />
-              <Card
-                icon={<PackageSearch />}
-                label="Com preço"
-                value={summary.priced}
-              />
-              <Card
-                icon={<Boxes />}
-                label="Com saldo informado"
-                value={summary.stockDefined}
-              />
-              <Card
-                icon={<ShoppingBag />}
-                label="Pedidos"
-                value={summary.orders}
-              />
-            </>
-          ) : (
-            <>
-              <Card
-                icon={<ShoppingBag />}
-                label="Aguardando pagamento"
-                value={orderMetrics.awaiting}
-              />
-              <Card
-                icon={<ClipboardCheck />}
-                label="Para separar"
-                value={orderMetrics.packing}
-              />
-              <Card
-                icon={<Truck />}
-                label="Em transporte"
-                value={orderMetrics.shipped}
-              />
-              <Card
-                icon={<Check />}
-                label="Entregues"
-                value={orderMetrics.completed}
-              />
-            </>
-          )}
-        </div>
+        {tab !== "finance" && (
+          <div className="admin-summary">
+            {tab === "inventory" ? (
+              <>
+                <Card
+                  icon={<Database />}
+                  label="Produtos importados"
+                  value={summary.products}
+                />
+                <Card
+                  icon={<PackageSearch />}
+                  label="Com preço"
+                  value={summary.priced}
+                />
+                <Card
+                  icon={<Boxes />}
+                  label="Com saldo informado"
+                  value={summary.stockDefined}
+                />
+                <Card
+                  icon={<ShoppingBag />}
+                  label="Pedidos"
+                  value={summary.orders}
+                />
+              </>
+            ) : (
+              <>
+                <Card
+                  icon={<ShoppingBag />}
+                  label="Aguardando pagamento"
+                  value={orderMetrics.awaiting}
+                />
+                <Card
+                  icon={<ClipboardCheck />}
+                  label="Para separar"
+                  value={orderMetrics.packing}
+                />
+                <Card
+                  icon={<Truck />}
+                  label="Em transporte"
+                  value={orderMetrics.shipped}
+                />
+                <Card
+                  icon={<Check />}
+                  label="Entregues"
+                  value={orderMetrics.completed}
+                />
+              </>
+            )}
+          </div>
+        )}
         {tab === "inventory" ? (
           <Inventory
             products={products}
@@ -313,8 +333,10 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
             search={() => loadProducts(query)}
             save={save}
           />
-        ) : (
+        ) : tab === "orders" ? (
           <Orders orders={orders} loading={loading} updateOrder={updateOrder} />
+        ) : (
+          <Finance orders={orders} loading={loading} />
         )}
       </section>
     </main>
@@ -337,6 +359,152 @@ function Card({
         <small>{label}</small>
         <b>{value.toLocaleString("pt-BR")}</b>
       </span>
+    </article>
+  );
+}
+
+function Finance({ orders, loading }: { orders: Order[]; loading: boolean }) {
+  if (loading) return <Loading />;
+  const confirmedStatuses = new Set([
+    "paid",
+    "processing",
+    "shipped",
+    "delivered",
+  ]);
+  const confirmed = orders.filter((order) =>
+    confirmedStatuses.has(order.status),
+  );
+  const revenue = confirmed.reduce((sum, order) => sum + order.totalCents, 0);
+  const average = confirmed.length ? Math.round(revenue / confirmed.length) : 0;
+  const awaiting = orders
+    .filter((order) => order.status === "awaiting_payment")
+    .reduce((sum, order) => sum + order.totalCents, 0);
+  const last30 = confirmed.filter((order) => {
+    const created = new Date(order.createdAt.replace(" ", "T") + "Z");
+    return Date.now() - created.getTime() <= 30 * 24 * 60 * 60 * 1000;
+  });
+  const products = new Map<
+    string,
+    { code: string; name: string; quantity: number; revenue: number }
+  >();
+  for (const order of confirmed) {
+    for (const item of order.items || []) {
+      const current = products.get(item.itemKey) || {
+        code: item.itemKey,
+        name: item.name,
+        quantity: 0,
+        revenue: 0,
+      };
+      current.quantity += item.quantity;
+      current.revenue += item.unitPriceCents * item.quantity;
+      products.set(item.itemKey, current);
+    }
+  }
+  const topProducts = [...products.values()]
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, 5);
+  const statusData = Object.entries(statusLabels).map(([status, label]) => ({
+    status,
+    label,
+    count: orders.filter((order) => order.status === status).length,
+  }));
+  const maxStatus = Math.max(1, ...statusData.map((item) => item.count));
+  return (
+    <div className="finance-dashboard">
+      <section className="finance-kpis">
+        <FinanceCard
+          label="Faturamento confirmado"
+          value={money(revenue)}
+          detail={`${confirmed.length} pedidos pagos`}
+          icon={<TrendingUp />}
+        />
+        <FinanceCard
+          label="Últimos 30 dias"
+          value={money(
+            last30.reduce((sum, order) => sum + order.totalCents, 0),
+          )}
+          detail={`${last30.length} pedidos no período`}
+          icon={<BarChart3 />}
+        />
+        <FinanceCard
+          label="Ticket médio"
+          value={money(average)}
+          detail="Média por pedido confirmado"
+          icon={<ShoppingBag />}
+        />
+        <FinanceCard
+          label="Aguardando pagamento"
+          value={money(awaiting)}
+          detail={`${orders.filter((order) => order.status === "awaiting_payment").length} pedidos pendentes`}
+          icon={<ClipboardCheck />}
+        />
+      </section>
+      <section className="finance-panels">
+        <article className="finance-chart">
+          <header>
+            <span>
+              <small>OPERAÇÃO</small>
+              <h2>Pedidos por etapa</h2>
+            </span>
+            <b>{orders.length} pedidos</b>
+          </header>
+          <div>
+            {statusData.map((item) => (
+              <div className="finance-bar" key={item.status}>
+                <span>{item.label}</span>
+                <i>
+                  <b style={{ width: `${(item.count / maxStatus) * 100}%` }} />
+                </i>
+                <strong>{item.count}</strong>
+              </div>
+            ))}
+          </div>
+        </article>
+        <article className="top-products">
+          <header>
+            <span>
+              <small>DESEMPENHO</small>
+              <h2>Peças mais vendidas</h2>
+            </span>
+          </header>
+          {topProducts.length ? (
+            topProducts.map((product, index) => (
+              <div key={product.code}>
+                <i>{String(index + 1).padStart(2, "0")}</i>
+                <span>
+                  <b>{product.name}</b>
+                  <small>{product.code}</small>
+                </span>
+                <strong>{product.quantity} un.</strong>
+                <em>{money(product.revenue)}</em>
+              </div>
+            ))
+          ) : (
+            <p>Nenhuma venda confirmada para calcular o ranking.</p>
+          )}
+        </article>
+      </section>
+    </div>
+  );
+}
+
+function FinanceCard({
+  label,
+  value,
+  detail,
+  icon,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  icon: React.ReactNode;
+}) {
+  return (
+    <article>
+      <div>{icon}</div>
+      <small>{label}</small>
+      <b>{value}</b>
+      <span>{detail}</span>
     </article>
   );
 }
