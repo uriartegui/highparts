@@ -50,6 +50,7 @@ jobs:
           CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
           CLOUDFLARE_D1_DATABASE_NAME: ${{ vars.CLOUDFLARE_D1_DATABASE_NAME }}
           CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
+          AUTH_FROM_EMAIL: ${{ vars.AUTH_FROM_EMAIL }}
 
       - name: Resolve preview alias
         id: alias
@@ -66,7 +67,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.92.0"
+          wranglerVersion: "4.149.0"
           command: >-
             versions upload --config dist/server/wrangler.deploy.json
             --preview-alias ${{ steps.alias.outputs.value }}
