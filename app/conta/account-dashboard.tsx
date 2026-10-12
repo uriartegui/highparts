@@ -226,14 +226,19 @@ export default function AccountDashboard({ user }: { user: User }) {
   }
   return (
     <main className="account">
-      <button
-        className="account-mobile-menu"
-        onClick={() => setMenuOpen((open) => !open)}
-        aria-label={menuOpen ? "Fechar menu da conta" : "Abrir menu da conta"}
-        aria-expanded={menuOpen}
-      >
-        {menuOpen ? <X /> : <Menu />}
-      </button>
+      <div className="account-mobile-header">
+        <button
+          className="account-mobile-menu"
+          onClick={() => setMenuOpen((open) => !open)}
+          aria-label={menuOpen ? "Fechar menu da conta" : "Abrir menu da conta"}
+          aria-expanded={menuOpen}
+        >
+          {menuOpen ? <X /> : <Menu />}
+        </button>
+        <a href="/" aria-label="HighParts — página inicial">
+          <img src="/highparts-logo.png" alt="HighParts" />
+        </a>
+      </div>
       <button
         className={`account-menu-backdrop ${menuOpen ? "show" : ""}`}
         onClick={() => setMenuOpen(false)}
