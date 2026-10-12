@@ -117,9 +117,13 @@ export default function StoreHeader({
     <>
       {darkTopbar && (
         <div className="topbar">
-          <span>Compra segura</span>
-          <span>Compatibilidade orientada por veículo</span>
-          <span>Atendimento especialista</span>
+          <span data-mobile="Compra segura">Compra segura</span>
+          <span data-mobile="Compatível por veículo">
+            Compatibilidade por veículo
+          </span>
+          <span data-mobile="Suporte especialista">
+            Atendimento especialista
+          </span>
         </div>
       )}
       <header className="header store-header">
