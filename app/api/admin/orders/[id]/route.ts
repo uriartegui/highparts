@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getAdmin } from "../../../../admin/admin-auth";
-import { sendAuthEmail } from "../../../../email";
+import { escapeHtml, sendAuthEmail } from "../../../../email";
 
 const statuses = new Set([
   "awaiting_payment",
@@ -129,12 +129,12 @@ export async function PATCH(
   if (nextStatus !== order.status) {
     const trackingHtml =
       nextStatus === "shipped" && tracking
-        ? `<p>Transportadora: <b>${carrier}</b><br>Código de rastreio: <b>${tracking}</b></p>`
+        ? `<p>Transportadora: <b>${escapeHtml(carrier)}</b><br>Código de rastreio: <b>${escapeHtml(tracking)}</b></p>`
         : "";
     const delivery = await sendAuthEmail(
       order.customerEmail,
       `Pedido ${id}: ${labels[nextStatus]}`,
-      `<p>Olá, ${order.customerName}.</p><p>O status do seu pedido <b>${id}</b> foi atualizado para <b>${labels[nextStatus]}</b>.</p>${trackingHtml}<p>Acompanhe os detalhes na sua conta HighParts.</p>`,
+      `<p>Olá, ${escapeHtml(order.customerName)}.</p><p>O status do seu pedido <b>${escapeHtml(id)}</b> foi atualizado para <b>${labels[nextStatus]}</b>.</p>${trackingHtml}<p>Acompanhe os detalhes na sua conta HighParts.</p>`,
     );
     emailSent = delivery.sent;
   }

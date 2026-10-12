@@ -1,9 +1,21 @@
 "use client";
 
-import { FormEvent, useCallback, useState } from "react";
+import { FormEvent, useCallback, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import TurnstileWidget from "../turnstile-widget";
+
+// Only same-origin paths are allowed; "/\evil.com" and "//evil.com" resolve to
+// other hosts in browsers, so validate the resolved origin instead of the prefix.
+function safeReturnPath(value: string | null) {
+  if (!value || !value.startsWith("/")) return "/";
+  try {
+    const url = new URL(value, window.location.origin);
+    return url.origin === window.location.origin ? `${url.pathname}${url.search}${url.hash}` : "/";
+  } catch {
+    return "/";
+  }
+}
 
 function formatPhone(value: string) {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -12,7 +24,7 @@ function formatPhone(value: string) {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const params = useSearchParams();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [error, setError] = useState("");
@@ -22,6 +34,7 @@ export default function LoginPage() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [turnstileToken,setTurnstileToken]=useState("");
   const onTurnstile=useCallback((token:string)=>setTurnstileToken(token),[]);
+  const [turnstileReset,setTurnstileReset]=useState(0);
 
   function changeMode(nextMode: "login" | "register") {
     setMode(nextMode); setError(""); setFieldErrors({}); setShowPassword(false); setShowConfirmation(false);
@@ -38,10 +51,11 @@ export default function LoginPage() {
       if (result.fieldErrors) setFieldErrors(result.fieldErrors);
       else if (result.field) setFieldErrors({ [result.field]: result.error });
       else setError(result.error ?? "Não foi possível continuar.");
+      setTurnstileReset(value => value + 1);
       setLoading(false); return;
     }
     const requested = params.get("returnTo");
-    window.location.href = requested?.startsWith("/") && !requested.startsWith("//") ? requested : "/";
+    window.location.href = safeReturnPath(requested);
   }
 
   return <main className="auth-page"><a href="/"><img src="/highparts-logo.png" alt="HighParts" /></a><section>
@@ -52,7 +66,12 @@ export default function LoginPage() {
       <label className={fieldErrors.email ? "field-invalid" : ""}>E-mail<input name="email" type="email" required autoComplete="email" aria-invalid={!!fieldErrors.email} onChange={() => setFieldErrors(current => ({ ...current, email: "" }))} />{fieldErrors.email && <small className="field-error">{fieldErrors.email}</small>}</label>
       <label className={fieldErrors.password ? "field-invalid" : ""}>Senha<span className="password-field"><input name="password" type={showPassword ? "text" : "password"} minLength={mode === "register" ? 10 : 1} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!fieldErrors.password} onChange={() => setFieldErrors(current => ({ ...current, password: "" }))} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}>{showPassword ? <EyeOff /> : <Eye />}</button></span>{mode === "register" && !fieldErrors.password && <small className="field-hint">Mínimo de 10 caracteres, com letra e número.</small>}{fieldErrors.password && <small className="field-error">{fieldErrors.password}</small>}</label>
       {mode === "register" && <label className={fieldErrors.confirmPassword ? "field-invalid" : ""}>Confirmar senha<span className="password-field"><input name="confirmPassword" type={showConfirmation ? "text" : "password"} required minLength={8} autoComplete="new-password" aria-invalid={!!fieldErrors.confirmPassword} onChange={() => setFieldErrors(current => ({ ...current, confirmPassword: "" }))} /><button type="button" onClick={() => setShowConfirmation(!showConfirmation)} aria-label={showConfirmation ? "Ocultar confirmação de senha" : "Mostrar confirmação de senha"}>{showConfirmation ? <EyeOff /> : <Eye />}</button></span>{fieldErrors.confirmPassword && <small className="field-error">{fieldErrors.confirmPassword}</small>}</label>}
-      {mode === "login" && <a className="forgot-link" href="/esqueci-senha">Esqueci minha senha</a>}<TurnstileWidget onToken={onTurnstile}/>{fieldErrors.turnstile&&<small className="field-error">{fieldErrors.turnstile}</small>}{error && <p className="auth-error">{error}</p>}<button className="auth-submit" disabled={loading}>{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar minha conta"}</button>
+      {mode === "login" && <a className="forgot-link" href="/esqueci-senha">Esqueci minha senha</a>}<TurnstileWidget onToken={onTurnstile} resetSignal={turnstileReset}/>{fieldErrors.turnstile&&<small className="field-error">{fieldErrors.turnstile}</small>}{error && <p className="auth-error">{error}</p>}<button className="auth-submit" disabled={loading}>{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar minha conta"}</button>
     </form><div className="auth-secure"><ShieldCheck /><span><b>Sessão protegida</b><small>Senha criptografada e cookie seguro.</small></span></div>
   </section></main>;
+}
+
+// useSearchParams() must render inside a Suspense boundary (required by vinext/Next).
+export default function LoginPage() {
+  return <Suspense fallback={null}><LoginPageContent /></Suspense>;
 }

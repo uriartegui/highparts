@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { hashToken, isTrustedRequest } from "../../../auth";
+import { escapeHtml } from "../../../email";
 
 function randomToken() {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
     const sent = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { authorization: `Bearer ${emailEnv.RESEND_API_KEY}`, "content-type": "application/json" },
-      body: JSON.stringify({ from: emailEnv.AUTH_FROM_EMAIL, to: [email], subject: "Redefina sua senha da HighParts", html: `<p>Olá, ${user.name}.</p><p>Recebemos um pedido para redefinir sua senha.</p><p><a href="${resetUrl}">Criar uma nova senha</a></p><p>Este link expira em 30 minutos. Se você não fez este pedido, ignore este e-mail.</p>` }),
+      body: JSON.stringify({ from: emailEnv.AUTH_FROM_EMAIL, to: [email], subject: "Redefina sua senha da HighParts", html: `<p>Olá, ${escapeHtml(user.name)}.</p><p>Recebemos um pedido para redefinir sua senha.</p><p><a href="${resetUrl}">Criar uma nova senha</a></p><p>Este link expira em 30 minutos. Se você não fez este pedido, ignore este e-mail.</p>` }),
     });
     if (!sent.ok) return Response.json({ error: "Não foi possível enviar o e-mail agora. Tente novamente mais tarde." }, { status: 503 });
   }

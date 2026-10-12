@@ -16,7 +16,7 @@ export async function PUT(request: Request) {
   await env.DB.prepare("DELETE FROM saved_cart_items WHERE user_id=?").bind(user.id).run();
   for (let start = 0; start < items.length; start += 25) {
     const statements = items.slice(start, start + 25).map((item) => env.DB.prepare("INSERT INTO saved_cart_items (id,user_id,item_key,name,fit,price_cents,quantity) VALUES (?,?,?,?,?,?,?)")
-      .bind(crypto.randomUUID(), user.id, String(item.itemKey), String(item.name), String(item.fit ?? ""), Math.max(0, Number(item.priceCents)), Math.max(1, Number(item.quantity))));
+      .bind(crypto.randomUUID(), user.id, String(item.itemKey).slice(0, 80), String(item.name ?? "").slice(0, 200), String(item.fit ?? "").slice(0, 200), Math.min(100_000_000, Math.max(0, Math.round(Number(item.priceCents) || 0))), Math.max(1, Number(item.quantity))));
     if (statements.length) await env.DB.batch(statements);
   }
   return Response.json({ ok: true });

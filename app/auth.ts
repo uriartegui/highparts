@@ -33,7 +33,8 @@ export async function verifyTurnstile(request: Request, token?: string) {
   // Never require a challenge the browser cannot render. The rate limiter and
   // password checks remain active until both Turnstile keys are configured.
   if (!securityEnv.TURNSTILE_SECRET_KEY || !securityEnv.TURNSTILE_SITE_KEY) return true;
-  if (new URL(request.url).hostname.endsWith(".workers.dev")) return true;
+  // Once configured, the challenge applies on every hostname (including
+  // *.workers.dev) so bots cannot bypass it through an alternate URL.
   if (!token) return false;
   const form = new FormData();
   form.set("secret", securityEnv.TURNSTILE_SECRET_KEY);
@@ -41,7 +42,8 @@ export async function verifyTurnstile(request: Request, token?: string) {
   const ip = request.headers.get("CF-Connecting-IP");
   if (ip) form.set("remoteip", ip);
   const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
-  const result = await response.json() as { success?: boolean };
+  const result = await response.json() as { success?: boolean; "error-codes"?: string[]; hostname?: string };
+  if (result.success !== true) console.warn("turnstile_rejected", JSON.stringify({ codes: result["error-codes"] ?? [], hostname: result.hostname ?? null }));
   return result.success === true;
 }
 

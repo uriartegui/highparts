@@ -73,7 +73,10 @@ export async function POST(request: Request) {
     const data = await upstream.json() as FalconResponse;
     const info = data.data;
     if (!upstream.ok || !info?.marca || !info?.modelo) {
-      return Response.json({ error: data.message || data.error || "Não foi possível identificar este veículo." }, { status: upstream.status >= 500 ? 502 : upstream.status, headers: jsonHeaders });
+      // Provider messages stay in the logs; clients get a stable, generic error.
+      console.warn("vehicle_lookup_failed", upstream.status, data.message || data.error || "");
+      const notFound = upstream.ok || upstream.status === 404;
+      return Response.json({ error: notFound ? "Não foi possível identificar este veículo." : "O serviço de identificação veicular não respondeu. Tente novamente em instantes." }, { status: notFound ? 404 : 502, headers: jsonHeaders });
     }
     const cc = Number(String(info.cilindradas ?? "").replace(/\D/g, ""));
     const vehicle: Vehicle = {

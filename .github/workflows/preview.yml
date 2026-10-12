@@ -1,0 +1,84 @@
+name: Preview version
+
+# Manual, non-promoting upload: creates a Worker version with a preview URL and
+# leaves the active production deployment untouched. Database migrations are
+# intentionally NOT applied here.
+#
+# WARNING: the preview version uses the same bindings as production (including
+# the production D1). Use it only for rendering/navigation smoke tests — do not
+# register accounts, place orders or change data from the preview URL.
+
+on:
+  workflow_dispatch:
+    inputs:
+      alias:
+        description: "Preview alias (lowercase letters, digits and hyphens)"
+        required: false
+        default: ""
+
+concurrency:
+  group: highparts-preview
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend and backend
+        run: npm run build
+
+      - name: Prepare production configuration
+        run: node scripts/prepare-cloudflare-deploy.mjs
+        env:
+          CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
+          CLOUDFLARE_D1_DATABASE_NAME: ${{ vars.CLOUDFLARE_D1_DATABASE_NAME }}
+          CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
+          AUTH_FROM_EMAIL: ${{ vars.AUTH_FROM_EMAIL }}
+
+      - name: Resolve preview alias
+        id: alias
+        env:
+          INPUT_ALIAS: ${{ inputs.alias }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          raw="${INPUT_ALIAS:-$BRANCH}"
+          alias=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//' | cut -c1-40)
+          echo "value=${alias:-preview}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload preview version (not promoted)
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.149.0"
+          command: >-
+            versions upload --config dist/server/wrangler.deploy.json
+            --preview-alias ${{ steps.alias.outputs.value }}
+            --message "Preview ${{ github.ref_name }}@${{ github.sha }}"
+            --keep-vars
+
+      - name: Preview summary
+        run: |
+          {
+            echo "Preview version uploaded for \`${{ github.ref_name }}\` (${{ github.sha }})."
+            echo ""
+            echo "Find the preview URL in the step log above or in Cloudflare → Workers → Deployments."
+            echo "Production deployment was not changed. Do not write data through the preview URL."
+          } >> "$GITHUB_STEP_SUMMARY"
