@@ -10,7 +10,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type Props = {
   userName?: string | null;
@@ -62,7 +62,7 @@ const groups = [
           <small>COMPATIBILIDADE</small>
           <a href="/#compatibilidade">Consultar pela placa</a>
           <a href="/#compatibilidade">Assistente guiado</a>
-          <a href="/conta">Minha garagem</a>
+          <a href="/conta">Minha conta</a>
         </div>
         <a className="nav-feature wide" href="/#compatibilidade">
           <Search />
@@ -109,86 +109,6 @@ export default function StoreHeader({
   darkTopbar = true,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [vehicles, setVehicles] = useState<
-    Array<{
-      id: string;
-      plate: string;
-      brand: string;
-      model: string;
-      nickname: string;
-    }>
-  >([]);
-  useEffect(() => {
-    if (!userName) {
-      setVehicles([]);
-      return;
-    }
-    fetch("/api/account/vehicles")
-      .then((r) => (r.ok ? r.json() : { vehicles: [] }))
-      .then((data) => setVehicles(data.vehicles ?? []))
-      .catch(() => setVehicles([]));
-  }, [userName]);
-  const catalogVehicleModel = (value: string) => {
-    const normalized = value.trim().toUpperCase();
-    const compoundModels = [
-      "GRAND SIENA",
-      "PALIO WEEKEND",
-      "NEW BEETLE",
-      "SANTA FE",
-      "LAND CRUISER",
-    ];
-    return (
-      compoundModels.find((model) => normalized.startsWith(model)) ||
-      normalized.split(/\s+/)[0] ||
-      ""
-    );
-  };
-  const vehicleCatalogHref = (vehicle: {
-    plate: string;
-    brand: string;
-    model: string;
-  }) => {
-    const search = new URLSearchParams({ veiculo: vehicle.plate });
-    const model = catalogVehicleModel(vehicle.model);
-    if (model) search.set("q", model);
-    if (vehicle.brand) search.set("marca", vehicle.brand.toUpperCase());
-    return `/catalogo?${search.toString()}`;
-  };
-  const navigation = vehicles.length
-    ? [
-        groups[0],
-        {
-          label: "Peças para meus carros",
-          href: vehicleCatalogHref(vehicles[0]),
-          panel: (
-            <>
-              <div>
-                <small>MINHA GARAGEM</small>
-                {vehicles.map((vehicle) => (
-                  <a key={vehicle.id} href={vehicleCatalogHref(vehicle)}>
-                    {vehicle.nickname ||
-                      `${vehicle.brand} ${vehicle.model}`.trim() ||
-                      vehicle.plate}{" "}
-                    <small>{vehicle.plate}</small>
-                  </a>
-                ))}
-              </div>
-              <a className="nav-feature wide" href="/conta#vehicles">
-                <Sparkles />
-                <span>
-                  <b>Gerenciar garagem</b>
-                  <small>
-                    Adicione seus carros para encontrar peças compatíveis mais
-                    rápido.
-                  </small>
-                </span>
-              </a>
-            </>
-          ),
-        },
-        ...groups.slice(1),
-      ]
-    : groups;
   return (
     <>
       {darkTopbar && (
@@ -210,7 +130,7 @@ export default function StoreHeader({
           <img className="logo" src="/highparts-logo.png" alt="HighParts" />
         </a>
         <nav className={open ? "open" : ""} aria-label="Navegação principal">
-          {navigation.map((group) => (
+          {groups.map((group) => (
             <div className="nav-group" key={group.label}>
               <a className="nav-root" href={group.href}>
                 {group.label}

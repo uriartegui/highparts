@@ -36,25 +36,8 @@ const featuredCategories = [
   "CILINDRO MESTRE",
 ];
 
-function catalogVehicleModel(value: string) {
-  const normalized = value.trim().toUpperCase();
-  const compoundModels = [
-    "GRAND SIENA",
-    "PALIO WEEKEND",
-    "NEW BEETLE",
-    "SANTA FE",
-    "LAND CRUISER",
-  ];
-  return (
-    compoundModels.find((model) => normalized.startsWith(model)) ||
-    normalized.split(/\s+/)[0] ||
-    ""
-  );
-}
-
 export default function CatalogPage() {
   const initial = useSearchParams();
-  const savedVehiclePlate = initial.get("veiculo") || "";
   const [query, setQuery] = useState(initial.get("q") || "");
   const [category, setCategory] = useState(initial.get("categoria") || "");
   const [brand, setBrand] = useState(initial.get("marca") || "");
@@ -85,23 +68,6 @@ export default function CatalogPage() {
       .catch(() => {});
   }, []);
   useEffect(() => {
-    if (!savedVehiclePlate) return;
-    fetch("/api/vehicle/lookup", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ type: "plate", value: savedVehiclePlate }),
-    })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((result) => {
-        if (result?.vehicle) {
-          setQuery(catalogVehicleModel(result.vehicle.model));
-          setBrand(String(result.vehicle.brand || "").toUpperCase());
-          setPage(1);
-        }
-      })
-      .catch(() => {});
-  }, [savedVehiclePlate]);
-  useEffect(() => {
     const timer = setTimeout(async () => {
       setLoading(true);
       const params = new URLSearchParams({
@@ -114,7 +80,6 @@ export default function CatalogPage() {
       if (brand) params.set("brand", brand);
       if (axle) params.set("axle", axle);
       if (available) params.set("saleOnly", "1");
-      if (savedVehiclePlate) params.set("veiculo", savedVehiclePlate);
       const result = await fetch(`/api/catalog?${params}`)
         .then((r) => r.json() as Promise<CatalogResponse>)
         .catch(() => ({

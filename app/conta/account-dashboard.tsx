@@ -3,7 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import {
   AlertCircle,
-  Car,
   CheckCircle2,
   LayoutDashboard,
   LoaderCircle,
@@ -12,7 +11,6 @@ import {
   MapPin,
   Package,
   Plus,
-  Search,
   ShieldCheck,
   Store,
   Trash2,
@@ -25,16 +23,6 @@ type User = {
   role: string;
   phone: string;
   emailVerifiedAt: string | null;
-};
-type Vehicle = {
-  id: string;
-  plate: string;
-  brand: string;
-  model: string;
-  year: string;
-  version: string;
-  hasAbs: number | null;
-  nickname: string;
 };
 type Order = {
   id: string;
@@ -70,19 +58,8 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function AccountDashboard({ user }: { user: User }) {
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [addresses, setAddresses] = useState<Address[]>([]);
-  const [showVehicle, setShowVehicle] = useState(false);
-  const [savingVehicle, setSavingVehicle] = useState(false);
-  const [lookingUpVehicle, setLookingUpVehicle] = useState(false);
-  const [vehicleDraft, setVehicleDraft] = useState({
-    plate: "",
-    brand: "",
-    model: "",
-    year: "",
-    version: "",
-  });
   const [message, setMessage] = useState("");
   const [messageKind, setMessageKind] = useState<"success" | "error">(
     "success",
@@ -90,7 +67,7 @@ export default function AccountDashboard({ user }: { user: User }) {
   const [sending, setSending] = useState(false);
   const [showAddress, setShowAddress] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
-  const [activeSection, setActiveSection] = useState("vehicles");
+  const [activeSection, setActiveSection] = useState("addresses");
   const [lookingUpCep, setLookingUpCep] = useState(false);
   const [addressDraft, setAddressDraft] = useState({
     postalCode: "",
@@ -100,12 +77,10 @@ export default function AccountDashboard({ user }: { user: User }) {
     state: "",
   });
   const load = async () => {
-    const [v, o, a] = await Promise.all([
-      fetch("/api/account/vehicles").then((r) => r.json()),
+    const [o, a] = await Promise.all([
       fetch("/api/account/orders").then((r) => r.json()),
       fetch("/api/account/addresses").then((r) => r.json()),
     ]);
-    setVehicles(v.vehicles ?? []);
     setOrders(o.orders ?? []);
     setAddresses(a.addresses ?? []);
   };
@@ -119,7 +94,7 @@ export default function AccountDashboard({ user }: { user: User }) {
   }, [message]);
   useEffect(() => {
     const root = document.querySelector(".account>section");
-    const sections = ["vehicles", "addresses", "orders"]
+    const sections = ["addresses", "orders"]
       .map((id) => document.getElementById(id))
       .filter(Boolean) as HTMLElement[];
     const observer = new IntersectionObserver(
@@ -134,45 +109,6 @@ export default function AccountDashboard({ user }: { user: User }) {
     sections.forEach((section) => observer.observe(section));
     return () => observer.disconnect();
   }, []);
-  async function lookupVehicle() {
-    const plate = vehicleDraft.plate.replace(/[^A-Z0-9]/gi, "").toUpperCase();
-    if (!/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(plate)) {
-      setMessageKind("error");
-      setMessage("Digite uma placa válida no formato ABC1234 ou ABC1D23.");
-      return;
-    }
-    setLookingUpVehicle(true);
-    setMessage("");
-    try {
-      const r = await fetch("/api/vehicle/lookup", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ type: "plate", value: plate }),
-      });
-      const d = await r.json();
-      if (!r.ok || !d.vehicle) {
-        setMessageKind("error");
-        setMessage(d.error || "Não foi possível consultar esta placa.");
-        return;
-      }
-      setVehicleDraft({
-        plate,
-        brand: d.vehicle.brand || "",
-        model: d.vehicle.model || "",
-        year: String(d.vehicle.year || "")
-          .replace(/[^0-9]/g, "")
-          .slice(0, 4),
-        version: d.vehicle.version || d.vehicle.engine || "",
-      });
-      setMessageKind("success");
-      setMessage("Veículo identificado. Confira os dados antes de salvar.");
-    } catch {
-      setMessageKind("error");
-      setMessage("Falha ao consultar a placa. Tente novamente.");
-    } finally {
-      setLookingUpVehicle(false);
-    }
-  }
   async function resend() {
     setSending(true);
     const r = await fetch("/api/auth/resend-verification", { method: "POST" });
@@ -184,45 +120,6 @@ export default function AccountDashboard({ user }: { user: User }) {
         : d.error,
     );
     setSending(false);
-  }
-  async function addVehicle(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const form = e.currentTarget;
-    setSavingVehicle(true);
-    setMessage("");
-    let response: Response;
-    let data: { error?: string } = {};
-    try {
-      const body = Object.fromEntries(new FormData(form));
-      response = await fetch("/api/account/vehicles", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      data = await response.json().catch(() => ({}));
-    } catch {
-      setMessageKind("error");
-      setMessage("Falha de conexão. Tente novamente.");
-      setSavingVehicle(false);
-      return;
-    }
-    if (!response.ok) {
-      setMessageKind("error");
-      setMessage(data.error || "Não foi possível salvar o veículo.");
-      setSavingVehicle(false);
-      return;
-    }
-    setMessageKind("success");
-    setMessage("Veículo salvo na sua garagem.");
-    form.reset();
-    setVehicleDraft({ plate: "", brand: "", model: "", year: "", version: "" });
-    setShowVehicle(false);
-    setSavingVehicle(false);
-    void load();
-  }
-  async function removeVehicle(id: string) {
-    await fetch(`/api/account/vehicles/${id}`, { method: "DELETE" });
-    load();
   }
   async function lookupCep(value: string) {
     const cep = value.replace(/\D/g, "").slice(0, 8);
@@ -287,7 +184,13 @@ export default function AccountDashboard({ user }: { user: User }) {
     setMessageKind("success");
     setMessage("Endereço salvo.");
     form.reset();
-    setAddressDraft({ postalCode: "", street: "", neighborhood: "", city: "", state: "" });
+    setAddressDraft({
+      postalCode: "",
+      street: "",
+      neighborhood: "",
+      city: "",
+      state: "",
+    });
     setShowAddress(false);
     setSavingAddress(false);
     void load();
@@ -312,13 +215,6 @@ export default function AccountDashboard({ user }: { user: User }) {
         </a>
         <nav>
           <span className="account-nav-label">CONTA</span>
-          <a
-            className={activeSection === "vehicles" ? "active" : ""}
-            href="#vehicles"
-            onClick={() => setActiveSection("vehicles")}
-          >
-            <Car /> Meus veículos
-          </a>
           <a
             className={activeSection === "addresses" ? "active" : ""}
             href="#addresses"
@@ -387,7 +283,11 @@ export default function AccountDashboard({ user }: { user: User }) {
               {messageKind === "success" ? <CheckCircle2 /> : <AlertCircle />}
             </i>
             <span>
-              <b>{messageKind === "success" ? "Tudo certo" : "Não foi possível continuar"}</b>
+              <b>
+                {messageKind === "success"
+                  ? "Tudo certo"
+                  : "Não foi possível continuar"}
+              </b>
               <small>{message}</small>
             </span>
             <button onClick={() => setMessage("")} aria-label="Fechar mensagem">
@@ -396,13 +296,6 @@ export default function AccountDashboard({ user }: { user: User }) {
           </div>
         )}
         <div className="account-overview">
-          <span>
-            <Car />
-            <b>{vehicles.length}</b>
-            <small>
-              {vehicles.length === 1 ? "veículo salvo" : "veículos salvos"}
-            </small>
-          </span>
           <span>
             <MapPin />
             <b>{addresses.length}</b>
@@ -418,162 +311,6 @@ export default function AccountDashboard({ user }: { user: User }) {
             </small>
           </span>
         </div>
-        <article id="vehicles" className="account-card">
-          <div className="account-card-head">
-            <span>
-              <small>GARAGEM</small>
-              <h2>Meus veículos</h2>
-            </span>
-            <button onClick={() => setShowVehicle(!showVehicle)}>
-              <Plus /> {showVehicle ? "Fechar cadastro" : "Adicionar veículo"}
-            </button>
-          </div>
-          {showVehicle && (
-            <form
-              className="vehicle-form expanded account-entry-form"
-              onSubmit={addVehicle}
-            >
-              <div className="account-form-intro">
-                <Car />
-                <span>
-                  <b>Dados do veículo</b>
-                  <small>
-                    Cadastre as informações principais para receber resultados
-                    mais precisos.
-                  </small>
-                </span>
-              </div>
-              <label>
-                Placa
-                <span className="plate-lookup-field">
-                  <input
-                    name="plate"
-                    placeholder="ABC1D23"
-                    required
-                    minLength={7}
-                    maxLength={7}
-                    autoCapitalize="characters"
-                    value={vehicleDraft.plate}
-                    onChange={(e) =>
-                      setVehicleDraft({
-                        ...vehicleDraft,
-                        plate: e.currentTarget.value
-                          .replace(/[^a-zA-Z0-9]/g, "")
-                          .toUpperCase()
-                          .slice(0, 7),
-                      })
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        lookupVehicle();
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={lookupVehicle}
-                    disabled={lookingUpVehicle}
-                    aria-label="Consultar placa e preencher veículo"
-                    title="Consultar placa"
-                  >
-                    {lookingUpVehicle ? <LoaderCircle className="spin" /> : <Search />}
-                  </button>
-                </span>
-                <small>Clique na lupa para preencher os dados</small>
-              </label>
-              <label>
-                Apelido <em>opcional</em>
-                <input name="nickname" placeholder="Ex.: Meu Gol" />
-              </label>
-              <label>
-                Marca
-                <input name="brand" placeholder="Ex.: Volkswagen" required value={vehicleDraft.brand} onChange={(e)=>setVehicleDraft({...vehicleDraft,brand:e.target.value})}/>
-              </label>
-              <label>
-                Modelo
-                <input name="model" placeholder="Ex.: Gol" required value={vehicleDraft.model} onChange={(e)=>setVehicleDraft({...vehicleDraft,model:e.target.value})}/>
-              </label>
-              <label>
-                Ano
-                <input
-                  name="year"
-                  type="number"
-                  inputMode="numeric"
-                  min="1900"
-                  max="2099"
-                  placeholder="Ex.: 2018"
-                  value={vehicleDraft.year}
-                  onChange={(e)=>setVehicleDraft({...vehicleDraft,year:e.target.value})}
-                />
-              </label>
-              <label>
-                Versão / motor <em>opcional</em>
-                <input name="version" placeholder="Ex.: 1.6 MSI" value={vehicleDraft.version} onChange={(e)=>setVehicleDraft({...vehicleDraft,version:e.target.value})}/>
-              </label>
-              <label>
-                Freios ABS
-                <select name="hasAbs" defaultValue="">
-                  <option value="">Não sei informar</option>
-                  <option value="true">Sim, possui ABS</option>
-                  <option value="false">Não possui ABS</option>
-                </select>
-              </label>
-              <div className="account-form-actions">
-                <button type="button" onClick={() => setShowVehicle(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" disabled={savingVehicle}>
-                  {savingVehicle ? (
-                    <>
-                      <LoaderCircle className="spin" /> Salvando...
-                    </>
-                  ) : (
-                    "Salvar veículo"
-                  )}
-                </button>
-              </div>
-            </form>
-          )}
-          <div className="vehicle-list">
-            {vehicles.length ? (
-              vehicles.map((v) => (
-                <div key={v.id}>
-                  <Car />
-                  <span>
-                    <b>
-                      {v.nickname || `${v.brand} ${v.model}` || "Meu veículo"}
-                    </b>
-                    <small>
-                      {v.plate}
-                      {v.year && ` • ${v.year}`}
-                      {v.version && ` • ${v.version}`}
-                      {v.hasAbs != null &&
-                        ` • ${v.hasAbs ? "Com ABS" : "Sem ABS"}`}
-                    </small>
-                  </span>
-                  <a
-                    href={`/?vehicle=${encodeURIComponent(v.plate)}#compatibilidade`}
-                  >
-                    Buscar peças
-                  </a>
-                  <button
-                    onClick={() => removeVehicle(v.id)}
-                    aria-label={`Remover ${v.plate}`}
-                  >
-                    <Trash2 />
-                  </button>
-                </div>
-              ))
-            ) : (
-              <div className="account-empty-state">
-                <Car />
-                <b>Sua garagem está vazia</b>
-                <p>Salve um veículo para consultar peças com mais rapidez.</p>
-              </div>
-            )}
-          </div>
-        </article>
         <article id="addresses" className="account-card">
           <div className="account-card-head">
             <span>

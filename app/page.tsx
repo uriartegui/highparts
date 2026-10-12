@@ -487,7 +487,7 @@ export default function Home() {
             <b>COMPRAR</b>
             <a href="/catalogo">Catálogo completo</a>
             <a href="#compatibilidade">Buscar pela placa</a>
-            <a href="/conta">Minha garagem</a>
+            <a href="/conta">Minha conta</a>
             <a href="/conta">Meus pedidos</a>
           </div>
           <div className="footer-column">
@@ -641,18 +641,7 @@ function Checkout({
       isDefault: number;
     }>
   >([]);
-  const [vehicles, setVehicles] = useState<
-    Array<{
-      id: string;
-      plate: string;
-      brand: string;
-      model: string;
-      nickname: string;
-    }>
-  >([]);
   const [selectedAddress, setSelectedAddress] = useState("");
-  const [selectedVehicle, setSelectedVehicle] = useState("");
-  const [newVehiclePlate, setNewVehiclePlate] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
   const [delivery, setDelivery] = useState({
     postalCode: "",
@@ -664,26 +653,18 @@ function Checkout({
     state: "",
   });
   useEffect(() => {
-    Promise.all([
-      fetch("/api/account/addresses").then((r) =>
-        r.ok ? r.json() : { addresses: [] },
-      ),
-      fetch("/api/account/vehicles").then((r) =>
-        r.ok ? r.json() : { vehicles: [] },
-      ),
-    ]).then(([a, v]) => {
-      const list = a.addresses ?? [];
-      const garage = v.vehicles ?? [];
-      setAddresses(list);
-      setVehicles(garage);
-      const preferred =
-        list.find((item: { isDefault: number }) => item.isDefault) || list[0];
-      if (preferred) {
-        setSelectedAddress(preferred.id);
-        setDelivery(preferred);
-      }
-      if (garage[0]) setSelectedVehicle(garage[0].plate);
-    });
+    fetch("/api/account/addresses")
+      .then((r) => (r.ok ? r.json() : { addresses: [] }))
+      .then((a) => {
+        const list = a.addresses ?? [];
+        setAddresses(list);
+        const preferred =
+          list.find((item: { isDefault: number }) => item.isDefault) || list[0];
+        if (preferred) {
+          setSelectedAddress(preferred.id);
+          setDelivery(preferred);
+        }
+      });
   }, []);
   function chooseAddress(id: string) {
     setSelectedAddress(id);
@@ -751,31 +732,6 @@ function Checkout({
         return;
       }
     }
-    const normalizedPlate = newVehiclePlate
-      .replace(/[^A-Z0-9]/gi, "")
-      .toUpperCase();
-    if (!selectedVehicle && normalizedPlate) {
-      const savedVehicle = await fetch("/api/account/vehicles", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          plate: normalizedPlate,
-          brand: "",
-          model: "",
-          year: "",
-          version: "",
-          nickname: "Meu veículo",
-        }),
-      });
-      if (!savedVehicle.ok) {
-        const detail = await savedVehicle.json().catch(() => ({}));
-        setError(
-          detail.error ?? "Não foi possível salvar o veículo na sua conta.",
-        );
-        setSaving(false);
-        return;
-      }
-    }
     const response = await fetch("/api/account/orders", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -783,7 +739,7 @@ function Checkout({
         phone: fields.phone,
         postalCode: delivery.postalCode,
         address: `${delivery.street}, ${delivery.number}${delivery.complement ? `, ${delivery.complement}` : ""} - ${delivery.neighborhood ? `${delivery.neighborhood}, ` : ""}${delivery.city}/${delivery.state}`,
-        vehiclePlate: selectedVehicle || normalizedPlate,
+        vehiclePlate: "",
         items: grouped,
       }),
     });
@@ -981,44 +937,6 @@ function Checkout({
                 />
               </label>
             </div>
-            <label className="checkout-vehicle">
-              Veículo deste pedido (opcional)
-              {vehicles.length > 0 && (
-                <select
-                  value={selectedVehicle}
-                  onChange={(e) => setSelectedVehicle(e.target.value)}
-                >
-                  <option value="">Adicionar outro veículo</option>
-                  {vehicles.map((vehicle) => (
-                    <option value={vehicle.plate} key={vehicle.id}>
-                      {vehicle.nickname || `${vehicle.brand} ${vehicle.model}`}{" "}
-                      — {vehicle.plate}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {!selectedVehicle && (
-                <input
-                  aria-label="Placa do novo veículo"
-                  placeholder="Placa — ABC1D23"
-                  maxLength={7}
-                  value={newVehiclePlate}
-                  onChange={(e) =>
-                    setNewVehiclePlate(
-                      e.target.value
-                        .replace(/[^a-zA-Z0-9]/g, "")
-                        .toUpperCase()
-                        .slice(0, 7),
-                    )
-                  }
-                />
-              )}
-              <small>
-                {selectedVehicle
-                  ? "Veículo salvo selecionado automaticamente."
-                  : "Ao finalizar, este veículo será salvo na sua garagem."}
-              </small>
-            </label>
           </FormCard>
           <FormCard
             number="3"
