@@ -38,6 +38,7 @@ const featuredCategories = [
 
 export default function CatalogPage() {
   const initial = useSearchParams();
+  const savedVehiclePlate = initial.get("veiculo") || "";
   const [query, setQuery] = useState(initial.get("q") || "");
   const [category, setCategory] = useState(initial.get("categoria") || "");
   const [brand, setBrand] = useState(initial.get("marca") || "");
@@ -68,6 +69,22 @@ export default function CatalogPage() {
       .catch(() => {});
   }, []);
   useEffect(() => {
+    if (!savedVehiclePlate || query) return;
+    fetch("/api/vehicle/lookup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ type: "plate", value: savedVehiclePlate }),
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result) => {
+        if (result?.vehicle) {
+          setQuery(`${result.vehicle.brand} ${result.vehicle.model}`.trim());
+          setPage(1);
+        }
+      })
+      .catch(() => {});
+  }, [savedVehiclePlate, query]);
+  useEffect(() => {
     const timer = setTimeout(async () => {
       setLoading(true);
       const params = new URLSearchParams({
@@ -80,6 +97,7 @@ export default function CatalogPage() {
       if (brand) params.set("brand", brand);
       if (axle) params.set("axle", axle);
       if (available) params.set("saleOnly", "1");
+      if (savedVehiclePlate) params.set("veiculo", savedVehiclePlate);
       const result = await fetch(`/api/catalog?${params}`)
         .then((r) => r.json() as Promise<CatalogResponse>)
         .catch(() => ({
@@ -102,6 +120,10 @@ export default function CatalogPage() {
     setPage(1);
   }
   function add(product: Product) {
+    if (!userName) {
+      location.href = `/entrar?returnTo=${encodeURIComponent(location.pathname + location.search)}`;
+      return;
+    }
     if (product.priceCents == null || !product.stockQuantity) return;
     const cart = JSON.parse(
       localStorage.getItem("highparts_cart") || "[]",
@@ -286,9 +308,15 @@ export default function CatalogPage() {
                         </em>
                       )}
                       {product.imageUrl ? (
-                        <img src={product.imageUrl} alt={`${product.product} ${product.code}`} />
+                        <img
+                          src={product.imageUrl}
+                          alt={`${product.product} ${product.code}`}
+                        />
                       ) : (
-                        <><i /><b>HP</b></>
+                        <>
+                          <i />
+                          <b>HP</b>
+                        </>
                       )}
                     </div>
                   </a>

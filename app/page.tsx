@@ -111,10 +111,9 @@ export default function Home() {
               }>,
           )
           .catch(() => ({ items: [] }));
-        const remote = (saved.items || [])
-          .flatMap((item) =>
-            Array.from({ length: item.quantity }, () => String(item.itemKey)),
-          );
+        const remote = (saved.items || []).flatMap((item) =>
+          Array.from({ length: item.quantity }, () => String(item.itemKey)),
+        );
         const selected = remote.length ? remote : local;
         await loadCartProducts(selected, mapped);
         setCart(selected);
@@ -123,8 +122,10 @@ export default function Home() {
         setCart(local);
       }
       setCartReady(true);
-      if (new URLSearchParams(window.location.search).get("checkout") === "1")
-        setCheckout(true);
+      if (new URLSearchParams(window.location.search).get("checkout") === "1") {
+        if (me.user) setCheckout(true);
+        else location.replace("/entrar?returnTo=/?checkout=1");
+      }
 
       async function loadCartProducts(ids: string[], current: Product[]) {
         const missing = [...new Set(ids)].filter(
@@ -138,10 +139,17 @@ export default function Home() {
         const extra = await fetch(`/api/catalog?${params}`)
           .then((r) => r.json() as Promise<{ products?: ApiProduct[] }>)
           .catch(() => ({ products: [] }));
-        const combined = [...current, ...(extra.products || []).map(mapProduct)];
-        setProducts(combined.filter((product, index, all) =>
-          all.findIndex((candidate) => candidate.id === product.id) === index,
-        ));
+        const combined = [
+          ...current,
+          ...(extra.products || []).map(mapProduct),
+        ];
+        setProducts(
+          combined.filter(
+            (product, index, all) =>
+              all.findIndex((candidate) => candidate.id === product.id) ===
+              index,
+          ),
+        );
       }
     })();
   }, []);
@@ -155,7 +163,9 @@ export default function Home() {
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams({ q: query, limit: "5" });
       fetch(`/api/catalog?${params}`, { signal: controller.signal })
-        .then((response) => response.json() as Promise<{ products?: ApiProduct[] }>)
+        .then(
+          (response) => response.json() as Promise<{ products?: ApiProduct[] }>,
+        )
         .then((data) => setHeroSuggestions(data.products || []))
         .catch(() => {});
     }, 220);
@@ -193,6 +203,14 @@ export default function Home() {
     .map((id) => products.find((p) => p.id === id)!)
     .filter(Boolean);
   const subtotal = items.reduce((s, p) => s + (p.price ?? 0), 0);
+  function addToCart(id: string) {
+    if (!user) {
+      location.href = `/entrar?returnTo=${encodeURIComponent(location.pathname)}`;
+      return;
+    }
+    setCart((current) => [...current, id]);
+    setCartOpen(true);
+  }
   if (checkout)
     return (
       <Checkout
@@ -412,13 +430,7 @@ export default function Home() {
                     <b>{money(p.price!)}</b>
                     <span>{p.stock} unidades disponíveis</span>
                   </div>
-                  <button
-                    className="buy"
-                    onClick={() => {
-                      setCart([...cart, p.id]);
-                      setCartOpen(true);
-                    }}
-                  >
+                  <button className="buy" onClick={() => addToCart(p.id)}>
                     <ShoppingCart /> Adicionar ao carrinho
                   </button>
                 </div>
@@ -554,6 +566,10 @@ export default function Home() {
               <small>Frete calculado no checkout</small>
               <button
                 onClick={() => {
+                  if (!user) {
+                    location.href = "/entrar?returnTo=/?checkout=1";
+                    return;
+                  }
                   setCartOpen(false);
                   setCheckout(true);
                 }}
@@ -611,15 +627,102 @@ function Checkout({
   const [orderId, setOrderId] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [addresses,setAddresses]=useState<Array<{id:string;label:string;postalCode:string;street:string;number:string;complement:string;neighborhood:string;city:string;state:string;isDefault:number}>>([]);
-  const [vehicles,setVehicles]=useState<Array<{id:string;plate:string;brand:string;model:string;nickname:string}>>([]);
-  const [selectedAddress,setSelectedAddress]=useState("");
-  const [selectedVehicle,setSelectedVehicle]=useState("");
-  const [cepLoading,setCepLoading]=useState(false);
-  const [delivery,setDelivery]=useState({postalCode:"",street:"",number:"",complement:"",neighborhood:"",city:"",state:""});
-  useEffect(()=>{Promise.all([fetch("/api/account/addresses").then(r=>r.ok?r.json():{addresses:[]}),fetch("/api/account/vehicles").then(r=>r.ok?r.json():{vehicles:[]})]).then(([a,v])=>{const list=a.addresses??[];setAddresses(list);setVehicles(v.vehicles??[]);const preferred=list.find((item:{isDefault:number})=>item.isDefault)||list[0];if(preferred){setSelectedAddress(preferred.id);setDelivery(preferred)}})},[]);
-  function chooseAddress(id:string){setSelectedAddress(id);const address=addresses.find(item=>item.id===id);if(address)setDelivery(address)}
-  async function lookupCheckoutCep(value:string){const cep=value.replace(/\D/g,"").slice(0,8);setSelectedAddress("");setDelivery(current=>({...current,postalCode:cep}));if(cep.length!==8)return;setCepLoading(true);try{const data=await fetch(`https://viacep.com.br/ws/${cep}/json/`).then(r=>r.json()) as {erro?:boolean;logradouro?:string;bairro?:string;localidade?:string;uf?:string};if(data.erro)throw new Error();setDelivery(current=>({...current,postalCode:cep,street:data.logradouro||"",neighborhood:data.bairro||"",city:data.localidade||"",state:data.uf||""}))}catch{setError("CEP não encontrado. Confira o número ou preencha o endereço manualmente.")}finally{setCepLoading(false)}}
+  const [addresses, setAddresses] = useState<
+    Array<{
+      id: string;
+      label: string;
+      postalCode: string;
+      street: string;
+      number: string;
+      complement: string;
+      neighborhood: string;
+      city: string;
+      state: string;
+      isDefault: number;
+    }>
+  >([]);
+  const [vehicles, setVehicles] = useState<
+    Array<{
+      id: string;
+      plate: string;
+      brand: string;
+      model: string;
+      nickname: string;
+    }>
+  >([]);
+  const [selectedAddress, setSelectedAddress] = useState("");
+  const [selectedVehicle, setSelectedVehicle] = useState("");
+  const [newVehiclePlate, setNewVehiclePlate] = useState("");
+  const [cepLoading, setCepLoading] = useState(false);
+  const [delivery, setDelivery] = useState({
+    postalCode: "",
+    street: "",
+    number: "",
+    complement: "",
+    neighborhood: "",
+    city: "",
+    state: "",
+  });
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/account/addresses").then((r) =>
+        r.ok ? r.json() : { addresses: [] },
+      ),
+      fetch("/api/account/vehicles").then((r) =>
+        r.ok ? r.json() : { vehicles: [] },
+      ),
+    ]).then(([a, v]) => {
+      const list = a.addresses ?? [];
+      const garage = v.vehicles ?? [];
+      setAddresses(list);
+      setVehicles(garage);
+      const preferred =
+        list.find((item: { isDefault: number }) => item.isDefault) || list[0];
+      if (preferred) {
+        setSelectedAddress(preferred.id);
+        setDelivery(preferred);
+      }
+      if (garage[0]) setSelectedVehicle(garage[0].plate);
+    });
+  }, []);
+  function chooseAddress(id: string) {
+    setSelectedAddress(id);
+    const address = addresses.find((item) => item.id === id);
+    if (address) setDelivery(address);
+  }
+  async function lookupCheckoutCep(value: string) {
+    const cep = value.replace(/\D/g, "").slice(0, 8);
+    setSelectedAddress("");
+    setDelivery((current) => ({ ...current, postalCode: cep }));
+    if (cep.length !== 8) return;
+    setCepLoading(true);
+    try {
+      const data = (await fetch(`https://viacep.com.br/ws/${cep}/json/`).then(
+        (r) => r.json(),
+      )) as {
+        erro?: boolean;
+        logradouro?: string;
+        bairro?: string;
+        localidade?: string;
+        uf?: string;
+      };
+      if (data.erro) throw new Error();
+      setDelivery((current) => ({
+        ...current,
+        postalCode: cep,
+        street: data.logradouro || "",
+        neighborhood: data.bairro || "",
+        city: data.localidade || "",
+        state: data.uf || "",
+      }));
+    } catch {
+      setError(
+        "CEP não encontrado. Confira o número ou preencha o endereço manualmente.",
+      );
+    } finally {
+      setCepLoading(false);
+    }
+  }
   async function finish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
@@ -629,14 +732,58 @@ function Checkout({
       itemKey: id,
       quantity: items.filter((x) => x.id === id).length,
     }));
+    if (!selectedAddress) {
+      const savedAddress = await fetch("/api/account/addresses", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          label: "Casa",
+          ...delivery,
+          isDefault: addresses.length === 0,
+        }),
+      });
+      if (!savedAddress.ok) {
+        const detail = await savedAddress.json().catch(() => ({}));
+        setError(
+          detail.error ?? "Não foi possível salvar o endereço na sua conta.",
+        );
+        setSaving(false);
+        return;
+      }
+    }
+    const normalizedPlate = newVehiclePlate
+      .replace(/[^A-Z0-9]/gi, "")
+      .toUpperCase();
+    if (!selectedVehicle && normalizedPlate) {
+      const savedVehicle = await fetch("/api/account/vehicles", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          plate: normalizedPlate,
+          brand: "",
+          model: "",
+          year: "",
+          version: "",
+          nickname: "Meu veículo",
+        }),
+      });
+      if (!savedVehicle.ok) {
+        const detail = await savedVehicle.json().catch(() => ({}));
+        setError(
+          detail.error ?? "Não foi possível salvar o veículo na sua conta.",
+        );
+        setSaving(false);
+        return;
+      }
+    }
     const response = await fetch("/api/account/orders", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         phone: fields.phone,
         postalCode: delivery.postalCode,
-        address: `${delivery.street}, ${delivery.number}${delivery.complement?`, ${delivery.complement}`:""} - ${delivery.neighborhood?`${delivery.neighborhood}, `:""}${delivery.city}/${delivery.state}`,
-        vehiclePlate: selectedVehicle,
+        address: `${delivery.street}, ${delivery.number}${delivery.complement ? `, ${delivery.complement}` : ""} - ${delivery.neighborhood ? `${delivery.neighborhood}, ` : ""}${delivery.city}/${delivery.state}`,
+        vehiclePlate: selectedVehicle || normalizedPlate,
         items: grouped,
       }),
     });
@@ -703,35 +850,175 @@ function Checkout({
             title="Entrega"
             subtitle="Informe o endereço de destino"
           >
-            {addresses.length>0&&<label className="saved-address-select">Usar endereço salvo<select value={selectedAddress} onChange={e=>chooseAddress(e.target.value)}><option value="">Preencher outro endereço</option>{addresses.map(address=><option value={address.id} key={address.id}>{address.label} — {address.street}, {address.number}</option>)}</select></label>}
+            {addresses.length > 0 && (
+              <label className="saved-address-select">
+                Usar endereço salvo
+                <select
+                  value={selectedAddress}
+                  onChange={(e) => chooseAddress(e.target.value)}
+                >
+                  <option value="">Preencher outro endereço</option>
+                  {addresses.map((address) => (
+                    <option value={address.id} key={address.id}>
+                      {address.label} — {address.street}, {address.number}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className="form-grid">
               <label>
                 CEP
-                <span className="checkout-cep"><input name="postalCode" placeholder="00000-000" required value={delivery.postalCode} onChange={e=>lookupCheckoutCep(e.target.value)}/>{cepLoading&&<span>Buscando…</span>}</span>
+                <span className="checkout-cep">
+                  <input
+                    name="postalCode"
+                    placeholder="00000-000"
+                    required
+                    value={delivery.postalCode}
+                    onChange={(e) => lookupCheckoutCep(e.target.value)}
+                  />
+                  {cepLoading && <span>Buscando…</span>}
+                </span>
               </label>
               <label>
                 Estado
-                <select name="state" required value={delivery.state} onChange={e=>setDelivery({...delivery,state:e.target.value})}>
+                <select
+                  name="state"
+                  required
+                  value={delivery.state}
+                  onChange={(e) =>
+                    setDelivery({ ...delivery, state: e.target.value })
+                  }
+                >
                   <option value="">Selecione</option>
-                  {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map(state=><option key={state}>{state}</option>)}
+                  {[
+                    "AC",
+                    "AL",
+                    "AP",
+                    "AM",
+                    "BA",
+                    "CE",
+                    "DF",
+                    "ES",
+                    "GO",
+                    "MA",
+                    "MT",
+                    "MS",
+                    "MG",
+                    "PA",
+                    "PB",
+                    "PR",
+                    "PE",
+                    "PI",
+                    "RJ",
+                    "RN",
+                    "RS",
+                    "RO",
+                    "RR",
+                    "SC",
+                    "SP",
+                    "SE",
+                    "TO",
+                  ].map((state) => (
+                    <option key={state}>{state}</option>
+                  ))}
                 </select>
               </label>
               <label className="full">
                 Endereço
-                <input name="address" placeholder="Rua, avenida..." required value={delivery.street} onChange={e=>setDelivery({...delivery,street:e.target.value})}/>
+                <input
+                  name="address"
+                  placeholder="Rua, avenida..."
+                  required
+                  value={delivery.street}
+                  onChange={(e) =>
+                    setDelivery({ ...delivery, street: e.target.value })
+                  }
+                />
               </label>
               <label>
                 Número
-                <input name="number" placeholder="123" required value={delivery.number} onChange={e=>setDelivery({...delivery,number:e.target.value})}/>
+                <input
+                  name="number"
+                  placeholder="123"
+                  required
+                  value={delivery.number}
+                  onChange={(e) =>
+                    setDelivery({ ...delivery, number: e.target.value })
+                  }
+                />
               </label>
               <label>
                 Complemento
-                <input name="complement" placeholder="Opcional" value={delivery.complement} onChange={e=>setDelivery({...delivery,complement:e.target.value})}/>
+                <input
+                  name="complement"
+                  placeholder="Opcional"
+                  value={delivery.complement}
+                  onChange={(e) =>
+                    setDelivery({ ...delivery, complement: e.target.value })
+                  }
+                />
               </label>
-              <label><span>Bairro</span><input name="neighborhood" value={delivery.neighborhood} onChange={e=>setDelivery({...delivery,neighborhood:e.target.value})}/></label>
-              <label><span>Cidade</span><input name="city" required value={delivery.city} onChange={e=>setDelivery({...delivery,city:e.target.value})}/></label>
+              <label>
+                <span>Bairro</span>
+                <input
+                  name="neighborhood"
+                  value={delivery.neighborhood}
+                  onChange={(e) =>
+                    setDelivery({ ...delivery, neighborhood: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                <span>Cidade</span>
+                <input
+                  name="city"
+                  required
+                  value={delivery.city}
+                  onChange={(e) =>
+                    setDelivery({ ...delivery, city: e.target.value })
+                  }
+                />
+              </label>
             </div>
-            {vehicles.length>0&&<label className="checkout-vehicle">Veículo deste pedido (opcional)<select value={selectedVehicle} onChange={e=>setSelectedVehicle(e.target.value)}><option value="">Não selecionar</option>{vehicles.map(vehicle=><option value={vehicle.plate} key={vehicle.id}>{vehicle.nickname||`${vehicle.brand} ${vehicle.model}`} — {vehicle.plate}</option>)}</select></label>}
+            <label className="checkout-vehicle">
+              Veículo deste pedido (opcional)
+              {vehicles.length > 0 && (
+                <select
+                  value={selectedVehicle}
+                  onChange={(e) => setSelectedVehicle(e.target.value)}
+                >
+                  <option value="">Adicionar outro veículo</option>
+                  {vehicles.map((vehicle) => (
+                    <option value={vehicle.plate} key={vehicle.id}>
+                      {vehicle.nickname || `${vehicle.brand} ${vehicle.model}`}{" "}
+                      — {vehicle.plate}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {!selectedVehicle && (
+                <input
+                  aria-label="Placa do novo veículo"
+                  placeholder="Placa — ABC1D23"
+                  maxLength={7}
+                  value={newVehiclePlate}
+                  onChange={(e) =>
+                    setNewVehiclePlate(
+                      e.target.value
+                        .replace(/[^a-zA-Z0-9]/g, "")
+                        .toUpperCase()
+                        .slice(0, 7),
+                    )
+                  }
+                />
+              )}
+              <small>
+                {selectedVehicle
+                  ? "Veículo salvo selecionado automaticamente."
+                  : "Ao finalizar, este veículo será salvo na sua garagem."}
+              </small>
+            </label>
           </FormCard>
           <FormCard
             number="3"

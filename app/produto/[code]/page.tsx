@@ -164,6 +164,10 @@ export default function ProductPage() {
       .finally(() => setLoading(false));
   }, [code]);
   function add() {
+    if (!userName) {
+      location.href = `/entrar?returnTo=${encodeURIComponent(location.pathname)}`;
+      return;
+    }
     if (!product || product.priceCents == null || !product.stockQuantity)
       return;
     const cart = JSON.parse(
@@ -279,17 +283,27 @@ export default function ProductPage() {
       </div>
       <section className="product-detail">
         <div className="product-gallery">
-          <div className={`product-render ${product.imageUrl ? "has-product-image" : ""}`}>
+          <div
+            className={`product-render ${product.imageUrl ? "has-product-image" : ""}`}
+          >
             <span>HIGHPARTS · {product.product}</span>
             {product.imageUrl ? (
-              <img src={product.imageUrl} alt={`${product.product} ${product.code}`} />
+              <img
+                src={product.imageUrl}
+                alt={`${product.product} ${product.code}`}
+              />
             ) : (
-              <><div className="render-disc" /><div className="render-caliper">HP</div></>
+              <>
+                <div className="render-disc" />
+                <div className="render-caliper">HP</div>
+              </>
             )}
             <b>{product.code}</b>
           </div>
           <small>
-            {product.imageUrl ? "Imagem cadastrada no catálogo HighParts." : "Imagem ilustrativa. Confira as especificações e a aplicação."}
+            {product.imageUrl
+              ? "Imagem cadastrada no catálogo HighParts."
+              : "Imagem ilustrativa. Confira as especificações e a aplicação."}
           </small>
         </div>
         <div className="product-info">
