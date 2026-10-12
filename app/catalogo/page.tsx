@@ -114,6 +114,14 @@ export default function CatalogPage() {
     }, 250);
     return () => clearTimeout(timer);
   }, [query, category, brand, axle, available, page]);
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [filtersOpen]);
   function clear() {
     setQuery("");
     setCategory("");
@@ -207,8 +215,24 @@ export default function CatalogPage() {
       )}
       <div className="catalog-shell">
         <button className="filter-mobile" onClick={() => setFiltersOpen(true)}>
-          <Filter /> Filtros {active.length > 0 && <b>{active.length}</b>}
+          <span>
+            <Filter />
+            <span>
+              <b>Refinar resultados</b>
+              <small>
+                {active.length > 0
+                  ? `${active.length} ${active.length === 1 ? "filtro ativo" : "filtros ativos"}`
+                  : "Categoria, fabricante e eixo"}
+              </small>
+            </span>
+          </span>
+          <ChevronRight />
         </button>
+        <button
+          className={`catalog-filter-backdrop ${filtersOpen ? "show" : ""}`}
+          onClick={() => setFiltersOpen(false)}
+          aria-label="Fechar filtros"
+        />
         <aside className={filtersOpen ? "open" : ""}>
           <header>
             <div>
@@ -261,6 +285,12 @@ export default function CatalogPage() {
           <button className="clear-filters" onClick={clear}>
             Limpar todos os filtros
           </button>
+          <footer className="catalog-filter-actions">
+            <button onClick={clear}>Limpar</button>
+            <button onClick={() => setFiltersOpen(false)}>
+              Ver {data.total.toLocaleString("pt-BR")} resultados
+            </button>
+          </footer>
         </aside>
         <section className="catalog-content">
           <nav
