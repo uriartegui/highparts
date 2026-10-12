@@ -158,6 +158,19 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}::sele
   .store-header>.header-actions .admin-link{display:flex;width:34px;height:34px;padding:0;align-items:center;justify-content:center;border-radius:50%;font-size:0;color:#595d64}
   .store-header>.header-actions .admin-link svg{width:20px;height:20px}
 }
+.account-mobile-menu,.account-menu-backdrop{display:none}
+@media(max-width:800px){
+  .account{position:relative}
+  .account-mobile-menu{display:grid;place-items:center;position:fixed;top:14px;left:14px;z-index:103;width:44px;height:44px;border:1px solid #e2e4e8;border-radius:14px;background:#fff;color:#16181b;box-shadow:0 10px 28px #1112}
+  .account-mobile-menu svg{width:21px;height:21px}
+  .account-menu-backdrop{display:block;position:fixed;inset:0;z-index:100;border:0;background:#050608b8;opacity:0;pointer-events:none;transition:opacity .28s ease;backdrop-filter:blur(3px)}
+  .account-menu-backdrop.show{opacity:1;pointer-events:auto}
+  .account>aside{display:flex;position:fixed;inset:0 auto 0 0;z-index:102;width:min(310px,84vw);height:100dvh;padding-top:72px;transform:translateX(-105%);transition:transform .3s cubic-bezier(.22,.85,.26,1);box-shadow:28px 0 70px #0006;overflow-y:auto}
+  .account>aside.mobile-open{display:flex;transform:translateX(0)}
+  .account>aside .account-logo{position:absolute;top:19px;left:76px;margin:0}
+  .account>aside .account-logo img{width:150px}
+  .account>section{padding-top:78px}
+}
 
 /* Mobile catalog filters: compact trigger and native-feeling bottom sheet. */
 .catalog-filter-backdrop,.catalog-filter-actions{display:none}

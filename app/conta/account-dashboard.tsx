@@ -9,11 +9,13 @@ import {
   LogOut,
   MailWarning,
   MapPin,
+  Menu,
   Package,
   Plus,
   ShieldCheck,
   Store,
   Trash2,
+  X,
 } from "lucide-react";
 
 type User = {
@@ -79,6 +81,7 @@ export default function AccountDashboard({ user }: { user: User }) {
   const [savingAddress, setSavingAddress] = useState(false);
   const [activeSection, setActiveSection] = useState("addresses");
   const [lookingUpCep, setLookingUpCep] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [addressDraft, setAddressDraft] = useState({
     postalCode: "",
     street: "",
@@ -102,6 +105,14 @@ export default function AccountDashboard({ user }: { user: User }) {
     const timer = window.setTimeout(() => setMessage(""), 6000);
     return () => window.clearTimeout(timer);
   }, [message]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [menuOpen]);
   useEffect(() => {
     const root = document.querySelector(".account>section");
     const sections = ["addresses", "orders"]
@@ -215,7 +226,20 @@ export default function AccountDashboard({ user }: { user: User }) {
   }
   return (
     <main className="account">
-      <aside>
+      <button
+        className="account-mobile-menu"
+        onClick={() => setMenuOpen((open) => !open)}
+        aria-label={menuOpen ? "Fechar menu da conta" : "Abrir menu da conta"}
+        aria-expanded={menuOpen}
+      >
+        {menuOpen ? <X /> : <Menu />}
+      </button>
+      <button
+        className={`account-menu-backdrop ${menuOpen ? "show" : ""}`}
+        onClick={() => setMenuOpen(false)}
+        aria-label="Fechar menu da conta"
+      />
+      <aside className={menuOpen ? "mobile-open" : ""}>
         <a
           className="account-logo"
           href="/"
@@ -228,14 +252,20 @@ export default function AccountDashboard({ user }: { user: User }) {
           <a
             className={activeSection === "addresses" ? "active" : ""}
             href="#addresses"
-            onClick={() => setActiveSection("addresses")}
+            onClick={() => {
+              setActiveSection("addresses");
+              setMenuOpen(false);
+            }}
           >
             <MapPin /> Endereços
           </a>
           <a
             className={activeSection === "orders" ? "active" : ""}
             href="#orders"
-            onClick={() => setActiveSection("orders")}
+            onClick={() => {
+              setActiveSection("orders");
+              setMenuOpen(false);
+            }}
           >
             <Package /> Pedidos
           </a>
