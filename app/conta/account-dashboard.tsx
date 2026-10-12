@@ -190,37 +190,35 @@ export default function AccountDashboard({ user }: { user: User }) {
     const form = e.currentTarget;
     setSavingVehicle(true);
     setMessage("");
+    let response: Response;
+    let data: { error?: string } = {};
     try {
       const body = Object.fromEntries(new FormData(form));
-      const r = await fetch("/api/account/vehicles", {
+      response = await fetch("/api/account/vehicles", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const d = await r.json();
-      if (!r.ok) {
-        setMessageKind("error");
-        setMessage(d.error || "Não foi possível salvar o veículo.");
-        return;
-      }
-      setMessageKind("success");
-      setMessage("Veículo salvo na sua garagem.");
-      form.reset();
-      setVehicleDraft({
-        plate: "",
-        brand: "",
-        model: "",
-        year: "",
-        version: "",
-      });
-      setShowVehicle(false);
-      load();
+      data = await response.json().catch(() => ({}));
     } catch {
       setMessageKind("error");
       setMessage("Falha de conexão. Tente novamente.");
-    } finally {
       setSavingVehicle(false);
+      return;
     }
+    if (!response.ok) {
+      setMessageKind("error");
+      setMessage(data.error || "Não foi possível salvar o veículo.");
+      setSavingVehicle(false);
+      return;
+    }
+    setMessageKind("success");
+    setMessage("Veículo salvo na sua garagem.");
+    form.reset();
+    setVehicleDraft({ plate: "", brand: "", model: "", year: "", version: "" });
+    setShowVehicle(false);
+    setSavingVehicle(false);
+    void load();
   }
   async function removeVehicle(id: string) {
     await fetch(`/api/account/vehicles/${id}`, { method: "DELETE" });
@@ -261,40 +259,38 @@ export default function AccountDashboard({ user }: { user: User }) {
     const form = e.currentTarget;
     setSavingAddress(true);
     setMessage("");
+    let response: Response;
+    let data: { error?: string } = {};
     try {
       const body = {
         ...Object.fromEntries(new FormData(form)),
         ...addressDraft,
       };
-      const r = await fetch("/api/account/addresses", {
+      response = await fetch("/api/account/addresses", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const d = await r.json();
-      if (!r.ok) {
-        setMessageKind("error");
-        setMessage(d.error || "Não foi possível salvar o endereço.");
-        return;
-      }
-      setMessageKind("success");
-      setMessage("Endereço salvo.");
-      form.reset();
-      setAddressDraft({
-        postalCode: "",
-        street: "",
-        neighborhood: "",
-        city: "",
-        state: "",
-      });
-      setShowAddress(false);
-      load();
+      data = await response.json().catch(() => ({}));
     } catch {
       setMessageKind("error");
       setMessage("Falha de conexão. Tente novamente.");
-    } finally {
       setSavingAddress(false);
+      return;
     }
+    if (!response.ok) {
+      setMessageKind("error");
+      setMessage(data.error || "Não foi possível salvar o endereço.");
+      setSavingAddress(false);
+      return;
+    }
+    setMessageKind("success");
+    setMessage("Endereço salvo.");
+    form.reset();
+    setAddressDraft({ postalCode: "", street: "", neighborhood: "", city: "", state: "" });
+    setShowAddress(false);
+    setSavingAddress(false);
+    void load();
   }
   async function removeAddress(id: string) {
     await fetch(`/api/account/addresses/${id}`, { method: "DELETE" });
