@@ -47,6 +47,12 @@ type StaticProduct = {
   axle: string;
   type: string;
 };
+type CheckoutUser = {
+  name: string;
+  email: string;
+  phone: string;
+  emailVerifiedAt: string | null;
+};
 const mapProduct = (p: ApiProduct): Product => ({
   id: p.code,
   name: p.product,
@@ -83,7 +89,7 @@ export default function Home() {
   const [cart, setCart] = useState<string[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkout, setCheckout] = useState(false);
-  const [user, setUser] = useState<{ name: string } | null>(null);
+  const [user, setUser] = useState<CheckoutUser | null>(null);
   const [cartReady, setCartReady] = useState(false);
   const [heroQuery, setHeroQuery] = useState("");
   const [heroSuggestions, setHeroSuggestions] = useState<ApiProduct[]>([]);
@@ -99,7 +105,7 @@ export default function Home() {
         localStorage.getItem("highparts_cart") || "[]",
       ) as string[];
       const me = await fetch("/api/auth/me")
-        .then((r) => r.json() as Promise<{ user: { name: string } | null }>)
+        .then((r) => r.json() as Promise<{ user: CheckoutUser | null }>)
         .catch(() => ({ user: null }));
       setUser(me.user);
       if (me.user) {
@@ -216,6 +222,7 @@ export default function Home() {
       <Checkout
         items={items}
         subtotal={subtotal}
+        user={user!}
         onBack={() => setCheckout(false)}
       />
     );
@@ -618,15 +625,26 @@ function Benefit({
 function Checkout({
   items,
   subtotal,
+  user,
   onBack,
 }: {
   items: Product[];
   subtotal: number;
+  user: CheckoutUser;
   onBack: () => void;
 }) {
   const [orderId, setOrderId] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const formatPhone = (value: string) => {
+    const digits = value.replace(/\D/g, "").slice(0, 11);
+    if (digits.length <= 2) return digits ? `(${digits}` : "";
+    if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10)
+      return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  };
+  const [phone, setPhone] = useState(() => formatPhone(user.phone || ""));
   const [addresses, setAddresses] = useState<
     Array<{
       id: string;
@@ -794,10 +812,29 @@ function Checkout({
             title="Contato"
             subtitle="Usaremos os dados da sua conta"
           >
+            <div className="checkout-account-summary">
+              <span>
+                <small>Comprando como</small>
+                <b>{user.name}</b>
+              </span>
+              <span>
+                <small>E-mail</small>
+                <b>{user.email}</b>
+              </span>
+            </div>
             <div className="form-grid">
               <label>
                 Telefone
-                <input name="phone" placeholder="(00) 00000-0000" required />
+                <input
+                  name="phone"
+                  placeholder="(00) 00000-0000"
+                  inputMode="tel"
+                  required
+                  value={phone}
+                  onChange={(event) =>
+                    setPhone(formatPhone(event.target.value))
+                  }
+                />
               </label>
             </div>
           </FormCard>
@@ -955,8 +992,24 @@ function Checkout({
               pagamento não estiver configurada.
             </p>
           </FormCard>
+          {!user.emailVerifiedAt && (
+            <div className="checkout-verification" role="alert">
+              <ShieldCheck />
+              <span>
+                <b>Confirme seu e-mail para criar o pedido</b>
+                <small>
+                  Acesse sua conta para reenviar a confirmação. Seu carrinho e
+                  endereço permanecerão salvos.
+                </small>
+              </span>
+              <a href="/conta">Confirmar e-mail</a>
+            </div>
+          )}
           {error && <p className="checkout-error">{error}</p>}
-          <button className="finish" disabled={!items.length || saving}>
+          <button
+            className="finish"
+            disabled={!items.length || saving || !user.emailVerifiedAt}
+          >
             {saving
               ? "Salvando pedido..."
               : `Criar pedido • ${money(subtotal)}`}{" "}
