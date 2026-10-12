@@ -85,6 +85,8 @@ export default function Home() {
   const [checkout, setCheckout] = useState(false);
   const [user, setUser] = useState<{ name: string } | null>(null);
   const [cartReady, setCartReady] = useState(false);
+  const [heroQuery, setHeroQuery] = useState("");
+  const [heroSuggestions, setHeroSuggestions] = useState<ApiProduct[]>([]);
   useEffect(() => {
     (async () => {
       const catalog = await fetch("/api/catalog?limit=60")
@@ -142,6 +144,25 @@ export default function Home() {
       }
     })();
   }, []);
+  useEffect(() => {
+    const query = heroQuery.trim();
+    if (query.length < 2) {
+      setHeroSuggestions([]);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({ q: query, limit: "5" });
+      fetch(`/api/catalog?${params}`, { signal: controller.signal })
+        .then((response) => response.json() as Promise<{ products?: ApiProduct[] }>)
+        .then((data) => setHeroSuggestions(data.products || []))
+        .catch(() => {});
+    }, 220);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [heroQuery]);
   useEffect(() => {
     if (!cartReady) return;
     localStorage.setItem("highparts_cart", JSON.stringify(cart));
@@ -207,11 +228,37 @@ export default function Home() {
               name="q"
               aria-label="Buscar peça no catálogo"
               placeholder="Digite a peça, o código ou o carro"
+              value={heroQuery}
+              onChange={(event) => setHeroQuery(event.target.value)}
+              aria-expanded={heroSuggestions.length > 0}
               autoComplete="off"
             />
             <button type="submit">
               Buscar peça <ChevronRight />
             </button>
+            {heroSuggestions.length > 0 && (
+              <div className="hero-suggestions">
+                <small>SUGESTÕES DO CATÁLOGO</small>
+                {heroSuggestions.map((product) => (
+                  <a
+                    href={`/produto/${encodeURIComponent(product.code)}`}
+                    key={product.code}
+                  >
+                    <span>
+                      <b>{product.product}</b>
+                      <small>{product.application}</small>
+                    </span>
+                    <strong>{product.code}</strong>
+                  </a>
+                ))}
+                <a
+                  className="hero-suggestions-all"
+                  href={`/catalogo?q=${encodeURIComponent(heroQuery)}`}
+                >
+                  Ver todos os resultados <ChevronRight />
+                </a>
+              </div>
+            )}
           </form>
           <div className="hero-cta">
             <a className="primary" href="#compatibilidade">
