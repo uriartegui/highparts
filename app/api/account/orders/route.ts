@@ -1,5 +1,9 @@
 import { env } from "cloudflare:workers";
 import { requireUser } from "../../../auth";
+import {
+  createMercadoPagoPreference,
+  mercadoPagoConfigured,
+} from "../../../mercado-pago";
 
 export async function GET() {
   const user = await requireUser();
@@ -197,14 +201,39 @@ export async function POST(request: Request) {
   await env.DB.prepare("DELETE FROM saved_cart_items WHERE user_id=?")
     .bind(user.id)
     .run();
+  let payment: {
+    configured: boolean;
+    checkoutUrl?: string;
+    message?: string;
+  } = {
+    configured: mercadoPagoConfigured(request),
+    message: "Pedido salvo. Não foi possível abrir o pagamento agora.",
+  };
+  if (payment.configured) {
+    try {
+      const preference = await createMercadoPagoPreference({
+        request,
+        orderId: id,
+        payer: { name: user.name, email: user.email },
+        items: validItems.map((item) => ({
+          code: item.product.code,
+          name: item.product.product,
+          quantity: item.quantity,
+          unitPriceCents: item.product.priceCents,
+        })),
+      });
+      await env.DB.prepare(
+        "UPDATE orders SET payment_provider='mercado_pago',payment_reference=?,payment_mode=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+      ).bind(preference.id, preference.mode, id).run();
+      payment = { configured: true, checkoutUrl: preference.checkoutUrl };
+    } catch (error) {
+      console.error("order_payment_preference_failed", id, error);
+    }
+  }
   return Response.json(
     {
       order: { id, totalCents: total, status: "awaiting_payment" },
-      payment: {
-        configured: false,
-        message:
-          "Pedido salvo. A cobrança será habilitada após configurar o provedor de pagamento.",
-      },
+      payment,
     },
     { status: 201 },
   );

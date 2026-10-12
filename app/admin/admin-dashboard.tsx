@@ -46,6 +46,7 @@ type Order = {
   totalCents: number;
   status: string;
   paymentProvider: string;
+  paymentMode: string | null;
   createdAt: string;
   itemCount: number;
   shippingAddress: string;
@@ -70,6 +71,8 @@ const statusLabels: Record<string, string> = {
   shipped: "Enviado",
   delivered: "Entregue",
   cancelled: "Cancelado",
+  payment_failed: "Pagamento falhou",
+  refunded: "Reembolsado",
 };
 const money = (cents: number) =>
   new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(
@@ -426,7 +429,7 @@ function Finance({ orders, loading }: { orders: Order[]; loading: boolean }) {
       order.customerPhone,
       statusLabels[order.status] || order.status,
       (order.totalCents / 100).toFixed(2).replace(".", ","),
-      order.paymentProvider,
+      order.paymentMode === "test" ? `${order.paymentProvider} (TESTE)` : order.paymentProvider,
       order.shippingCarrier,
       order.trackingCode,
       (order.items || [])
@@ -839,6 +842,7 @@ function Orders({
                       </span>
                       <i className={`status-${order.status}`}>
                         {statusLabels[order.status] || order.status}
+                        {order.paymentMode === "test" && " · TESTE"}
                       </i>
                     </button>
                     {opened && (

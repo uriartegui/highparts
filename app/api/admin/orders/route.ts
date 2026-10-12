@@ -12,7 +12,7 @@ export async function GET() {
     SELECT o.id, o.customer_name AS customerName, o.customer_email AS customerEmail,
            o.customer_phone AS customerPhone, o.shipping_address AS shippingAddress,
            o.vehicle_plate AS vehiclePlate, o.total_cents AS totalCents, o.status,
-           o.payment_provider AS paymentProvider, o.created_at AS createdAt,
+           o.payment_provider AS paymentProvider, o.payment_mode AS paymentMode, o.created_at AS createdAt,
            o.shipping_carrier AS shippingCarrier,o.shipping_service AS shippingService,
            o.tracking_code AS trackingCode,o.shipped_at AS shippedAt,
            COALESCE(SUM(i.quantity), 0) AS itemCount
