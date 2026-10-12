@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   if (!user) return Response.json({ error: "Não autorizado" }, { status: 401 });
   const input = await request.json() as Record<string, any>;
   const plate = String(input.plate ?? "").replace(/[^A-Z0-9]/gi, "").toUpperCase();
-  if (!/^[A-Z]{3}[0-9A-Z][0-9]{2}[0-9A-Z]$/.test(plate)) return Response.json({ error: "Placa inválida." }, { status: 400 });
+  if (!/^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(plate)) return Response.json({ error: "Placa inválida. Use o formato ABC1234 ou ABC1D23." }, { status: 400 });
   const id = crypto.randomUUID();
   const rawAbs=input.hasAbs;
   const hasAbs=rawAbs===true||rawAbs==="true"||rawAbs==="1"?1:rawAbs===false||rawAbs==="false"||rawAbs==="0"?0:null;
