@@ -67,6 +67,8 @@ const statusLabel: Record<string, string> = {
   shipped: "Enviado",
   delivered: "Entregue",
   cancelled: "Cancelado",
+  payment_failed: "Pagamento não concluído",
+  refunded: "Pagamento reembolsado",
 };
 
 export default function AccountDashboard({ user }: { user: User }) {
@@ -82,6 +84,7 @@ export default function AccountDashboard({ user }: { user: User }) {
   const [activeSection, setActiveSection] = useState("addresses");
   const [lookingUpCep, setLookingUpCep] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [payingOrder, setPayingOrder] = useState("");
   const [addressDraft, setAddressDraft] = useState({
     postalCode: "",
     street: "",
@@ -89,6 +92,25 @@ export default function AccountDashboard({ user }: { user: User }) {
     city: "",
     state: "",
   });
+  async function payOrder(id: string) {
+    setPayingOrder(id);
+    setMessage("");
+    const response = await fetch(
+      "/api/account/orders/" + encodeURIComponent(id) + "/payment",
+      { method: "POST" },
+    );
+    const result = (await response.json().catch(() => ({}))) as {
+      checkoutUrl?: string;
+      error?: string;
+    };
+    if (response.ok && result.checkoutUrl) {
+      location.href = result.checkoutUrl;
+      return;
+    }
+    setMessageKind("error");
+    setMessage(result.error || "Não foi possível abrir o pagamento agora.");
+    setPayingOrder("");
+  }
   const load = async () => {
     const [o, a] = await Promise.all([
       fetch("/api/account/orders").then((r) => r.json()),
@@ -647,8 +669,23 @@ export default function AccountDashboard({ user }: { user: User }) {
                         <p>
                           {o.paymentProvider === "pending_provider"
                             ? "Integração de pagamento pendente"
-                            : o.paymentProvider}
+                            : o.paymentProvider === "mercado_pago"
+                              ? "Mercado Pago"
+                              : o.paymentProvider}
                         </p>
+                        {["awaiting_payment", "payment_failed"].includes(
+                          o.status,
+                        ) && (
+                          <button
+                            className="order-pay-button"
+                            onClick={() => payOrder(o.id)}
+                            disabled={payingOrder === o.id}
+                          >
+                            {payingOrder === o.id
+                              ? "Abrindo pagamento..."
+                              : "Pagar com Mercado Pago"}
+                          </button>
+                        )}
                       </aside>
                     </div>
                   </section>

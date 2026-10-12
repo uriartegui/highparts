@@ -41,6 +41,7 @@ jobs:
           CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
           CLOUDFLARE_D1_DATABASE_NAME: ${{ vars.CLOUDFLARE_D1_DATABASE_NAME }}
           CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
+          AUTH_FROM_EMAIL: ${{ vars.AUTH_FROM_EMAIL }}
 
       - name: Apply database migrations
         uses: cloudflare/wrangler-action@v4

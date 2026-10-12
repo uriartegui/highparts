@@ -19,6 +19,19 @@ config.d1_databases = [{
   migrations_dir: "../../drizzle",
 }];
 
+// Plain (non-secret) runtime vars live in the deploy config so `wrangler deploy`
+// publishes them every time; vars added only in the dashboard are removed on
+// deploy. Secrets (TURNSTILE_SECRET_KEY, RESEND_API_KEY, ...) stay in Cloudflare.
+const TURNSTILE_SITE_KEY = "0x4AAAAAAFRY1fj2LtDemWa3"; // public by design: rendered in every page
+config.vars = {
+  ...config.vars,
+  TURNSTILE_SITE_KEY: process.env.TURNSTILE_SITE_KEY || TURNSTILE_SITE_KEY,
+  ...(process.env.AUTH_FROM_EMAIL ? { AUTH_FROM_EMAIL: process.env.AUTH_FROM_EMAIL } : {}),
+};
+if (!config.vars.AUTH_FROM_EMAIL) {
+  console.warn("AUTH_FROM_EMAIL is not set: verification and password reset emails will not be sent.");
+}
+
 await writeFile(outputPath, `${JSON.stringify(config, null, 2)}\n`);
 console.log(`Prepared ${outputPath.pathname} for ${config.name}.`);
 

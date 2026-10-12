@@ -634,6 +634,7 @@ function Checkout({
   onBack: () => void;
 }) {
   const [orderId, setOrderId] = useState("");
+  const [paymentRetrying, setPaymentRetrying] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const formatPhone = (value: string) => {
@@ -764,6 +765,7 @@ function Checkout({
     const result = (await response.json()) as {
       error?: string;
       order?: { id: string };
+      payment?: { checkoutUrl?: string; message?: string };
     };
     if (response.status === 401) {
       location.href = "/entrar?returnTo=/";
@@ -774,7 +776,28 @@ function Checkout({
       setSaving(false);
       return;
     }
+    if (result.payment?.checkoutUrl) {
+      location.href = result.payment.checkoutUrl;
+      return;
+    }
     setOrderId(result.order.id);
+  }
+  async function retryPayment() {
+    setPaymentRetrying(true);
+    setError("");
+    const response = await fetch(
+      "/api/account/orders/" + encodeURIComponent(orderId) + "/payment",
+      { method: "POST" },
+    );
+    const result = (await response.json().catch(() => ({}))) as {
+      checkoutUrl?: string;
+      error?: string;
+    };
+    if (response.ok && result.checkoutUrl) location.href = result.checkoutUrl;
+    else {
+      setError(result.error || "Não foi possível abrir o pagamento agora.");
+      setPaymentRetrying(false);
+    }
   }
   if (orderId)
     return (
@@ -783,12 +806,16 @@ function Checkout({
           <i>
             <Check />
           </i>
-          <small>PEDIDO RECEBIDO</small>
-          <h1>Pedido salvo!</h1>
+          <small>PEDIDO RESERVADO</small>
+          <h1>Pedido salvo.</h1>
           <p>
-            Pedido <b>#{orderId}</b> criado. Ele ficará aguardando pagamento até
-            conectarmos o provedor.
+            Pedido <b>#{orderId}</b> criado. Abra o Mercado Pago para concluir a
+            compra com segurança.
           </p>
+          {error && <p className="checkout-error">{error}</p>}
+          <button onClick={retryPayment} disabled={paymentRetrying}>
+            {paymentRetrying ? "Abrindo pagamento..." : "Pagar com Mercado Pago"}
+          </button>
           <a href="/conta">Acompanhar em minha conta</a>
           <button onClick={onBack}>Voltar para a loja</button>
         </div>
@@ -978,7 +1005,7 @@ function Checkout({
           <FormCard
             number="3"
             title="Pagamento"
-            subtitle="Será ativado após configurar o provedor"
+            subtitle="Você será direcionado ao ambiente seguro do Mercado Pago"
           >
             <div className="payment-tabs">
               <button type="button" className="active">
@@ -988,8 +1015,8 @@ function Checkout({
               <button type="button">Boleto</button>
             </div>
             <p style={{ fontSize: 10, color: "#777" }}>
-              Nenhum dado de cartão é solicitado enquanto a integração de
-              pagamento não estiver configurada.
+              Pix, cartão e boleto são processados pelo Mercado Pago. A HighParts
+              não recebe nem armazena os dados do seu cartão.
             </p>
           </FormCard>
           {!user.emailVerifiedAt && (
@@ -1012,7 +1039,7 @@ function Checkout({
           >
             {saving
               ? "Salvando pedido..."
-              : `Criar pedido • ${money(subtotal)}`}{" "}
+              : `Ir para o pagamento • ${money(subtotal)}`}{" "}
             <ChevronRight />
           </button>
         </form>
