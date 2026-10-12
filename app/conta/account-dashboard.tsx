@@ -2,7 +2,9 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import {
+  AlertCircle,
   Car,
+  CheckCircle2,
   LayoutDashboard,
   LoaderCircle,
   LogOut,
@@ -111,6 +113,11 @@ export default function AccountDashboard({ user }: { user: User }) {
     load();
   }, []);
   useEffect(() => {
+    if (!message) return;
+    const timer = window.setTimeout(() => setMessage(""), 6000);
+    return () => window.clearTimeout(timer);
+  }, [message]);
+  useEffect(() => {
     const root = document.querySelector(".account>section");
     const sections = ["vehicles", "addresses", "orders"]
       .map((id) => document.getElementById(id))
@@ -180,10 +187,11 @@ export default function AccountDashboard({ user }: { user: User }) {
   }
   async function addVehicle(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
     setSavingVehicle(true);
     setMessage("");
     try {
-      const body = Object.fromEntries(new FormData(e.currentTarget));
+      const body = Object.fromEntries(new FormData(form));
       const r = await fetch("/api/account/vehicles", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -197,7 +205,7 @@ export default function AccountDashboard({ user }: { user: User }) {
       }
       setMessageKind("success");
       setMessage("Veículo salvo na sua garagem.");
-      e.currentTarget.reset();
+      form.reset();
       setVehicleDraft({
         plate: "",
         brand: "",
@@ -250,11 +258,12 @@ export default function AccountDashboard({ user }: { user: User }) {
   }
   async function addAddress(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
     setSavingAddress(true);
     setMessage("");
     try {
       const body = {
-        ...Object.fromEntries(new FormData(e.currentTarget)),
+        ...Object.fromEntries(new FormData(form)),
         ...addressDraft,
       };
       const r = await fetch("/api/account/addresses", {
@@ -270,7 +279,7 @@ export default function AccountDashboard({ user }: { user: User }) {
       }
       setMessageKind("success");
       setMessage("Endereço salvo.");
-      e.currentTarget.reset();
+      form.reset();
       setAddressDraft({
         postalCode: "",
         street: "",
@@ -378,7 +387,13 @@ export default function AccountDashboard({ user }: { user: User }) {
         )}
         {message && (
           <div className={`account-message ${messageKind}`} role="status">
-            {message}
+            <i className="account-message-icon">
+              {messageKind === "success" ? <CheckCircle2 /> : <AlertCircle />}
+            </i>
+            <span>
+              <b>{messageKind === "success" ? "Tudo certo" : "Não foi possível continuar"}</b>
+              <small>{message}</small>
+            </span>
             <button onClick={() => setMessage("")} aria-label="Fechar mensagem">
               ×
             </button>
