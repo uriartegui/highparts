@@ -9,6 +9,8 @@ const statuses = new Set([
   "shipped",
   "delivered",
   "cancelled",
+  "payment_failed",
+  "refunded",
 ]);
 const labels: Record<string, string> = {
   awaiting_payment: "Aguardando pagamento",
@@ -17,6 +19,8 @@ const labels: Record<string, string> = {
   shipped: "Enviado",
   delivered: "Entregue",
   cancelled: "Cancelado",
+  payment_failed: "Pagamento não concluído",
+  refunded: "Pagamento reembolsado",
 };
 
 export async function PATCH(
