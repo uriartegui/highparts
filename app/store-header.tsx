@@ -128,14 +128,30 @@ export default function StoreHeader({
       .then((data) => setVehicles(data.vehicles ?? []))
       .catch(() => setVehicles([]));
   }, [userName]);
+  const catalogVehicleModel = (value: string) => {
+    const normalized = value.trim().toUpperCase();
+    const compoundModels = [
+      "GRAND SIENA",
+      "PALIO WEEKEND",
+      "NEW BEETLE",
+      "SANTA FE",
+      "LAND CRUISER",
+    ];
+    return (
+      compoundModels.find((model) => normalized.startsWith(model)) ||
+      normalized.split(/\s+/)[0] ||
+      ""
+    );
+  };
   const vehicleCatalogHref = (vehicle: {
     plate: string;
     brand: string;
     model: string;
   }) => {
     const search = new URLSearchParams({ veiculo: vehicle.plate });
-    const description = `${vehicle.brand} ${vehicle.model}`.trim();
-    if (description) search.set("q", description);
+    const model = catalogVehicleModel(vehicle.model);
+    if (model) search.set("q", model);
+    if (vehicle.brand) search.set("marca", vehicle.brand.toUpperCase());
     return `/catalogo?${search.toString()}`;
   };
   const navigation = vehicles.length

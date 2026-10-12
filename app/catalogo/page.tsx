@@ -36,6 +36,22 @@ const featuredCategories = [
   "CILINDRO MESTRE",
 ];
 
+function catalogVehicleModel(value: string) {
+  const normalized = value.trim().toUpperCase();
+  const compoundModels = [
+    "GRAND SIENA",
+    "PALIO WEEKEND",
+    "NEW BEETLE",
+    "SANTA FE",
+    "LAND CRUISER",
+  ];
+  return (
+    compoundModels.find((model) => normalized.startsWith(model)) ||
+    normalized.split(/\s+/)[0] ||
+    ""
+  );
+}
+
 export default function CatalogPage() {
   const initial = useSearchParams();
   const savedVehiclePlate = initial.get("veiculo") || "";
@@ -69,7 +85,7 @@ export default function CatalogPage() {
       .catch(() => {});
   }, []);
   useEffect(() => {
-    if (!savedVehiclePlate || query) return;
+    if (!savedVehiclePlate) return;
     fetch("/api/vehicle/lookup", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -78,12 +94,13 @@ export default function CatalogPage() {
       .then((response) => (response.ok ? response.json() : null))
       .then((result) => {
         if (result?.vehicle) {
-          setQuery(`${result.vehicle.brand} ${result.vehicle.model}`.trim());
+          setQuery(catalogVehicleModel(result.vehicle.model));
+          setBrand(String(result.vehicle.brand || "").toUpperCase());
           setPage(1);
         }
       })
       .catch(() => {});
-  }, [savedVehiclePlate, query]);
+  }, [savedVehiclePlate]);
   useEffect(() => {
     const timer = setTimeout(async () => {
       setLoading(true);
