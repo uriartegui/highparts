@@ -8,6 +8,7 @@ import {
   ListFilter,
   MessageCircle,
   PackageCheck,
+  Search,
   SearchCheck,
   ShieldCheck,
   ShoppingCart,
@@ -199,6 +200,19 @@ export default function Home() {
             Catálogo técnico, busca orientada pelo seu veículo e uma experiência
             de compra criada para transmitir confiança.
           </p>
+          <form className="hero-search" action="/catalogo" method="get">
+            <Search aria-hidden="true" />
+            <input
+              type="search"
+              name="q"
+              aria-label="Buscar peça no catálogo"
+              placeholder="Digite a peça, o código ou o carro"
+              autoComplete="off"
+            />
+            <button type="submit">
+              Buscar peça <ChevronRight />
+            </button>
+          </form>
           <div className="hero-cta">
             <a className="primary" href="#compatibilidade">
               Buscar pela placa <ChevronRight />
