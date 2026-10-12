@@ -33,7 +33,8 @@ export async function verifyTurnstile(request: Request, token?: string) {
   // Never require a challenge the browser cannot render. The rate limiter and
   // password checks remain active until both Turnstile keys are configured.
   if (!securityEnv.TURNSTILE_SECRET_KEY || !securityEnv.TURNSTILE_SITE_KEY) return true;
-  if (new URL(request.url).hostname.endsWith(".workers.dev")) return true;
+  // Once configured, the challenge applies on every hostname (including
+  // *.workers.dev) so bots cannot bypass it through an alternate URL.
   if (!token) return false;
   const form = new FormData();
   form.set("secret", securityEnv.TURNSTILE_SECRET_KEY);
