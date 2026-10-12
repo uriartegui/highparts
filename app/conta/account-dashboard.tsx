@@ -33,6 +33,12 @@ type Order = {
   shippingAddress: string;
   createdAt: string;
   itemCount: number;
+  items: Array<{
+    itemKey: string;
+    name: string;
+    unitPriceCents: number;
+    quantity: number;
+  }>;
 };
 type Address = {
   id: string;
@@ -521,24 +527,82 @@ export default function AccountDashboard({ user }: { user: User }) {
           </div>
           {orders.length ? (
             <div className="order-history">
-              {orders.map((o) => (
-                <div key={o.id}>
-                  <span>
-                    <b>#{o.id}</b>
-                    <small>
-                      {new Date(
-                        o.createdAt.replace(" ", "T") + "Z",
-                      ).toLocaleDateString("pt-BR")}{" "}
-                      • {o.itemCount} {o.itemCount === 1 ? "item" : "itens"}
-                      {o.vehiclePlate && ` • ${o.vehiclePlate}`}
-                    </small>
-                  </span>
-                  <strong>{money(o.totalCents)}</strong>
-                  <em className={`status-${o.status}`}>
-                    {statusLabel[o.status] || o.status}
-                  </em>
-                </div>
-              ))}
+              {orders.map((o) => {
+                const progress =
+                  {
+                    awaiting_payment: 0,
+                    paid: 1,
+                    processing: 2,
+                    shipped: 3,
+                    delivered: 3,
+                  }[o.status] ?? 0;
+                return (
+                  <section className="order-card" key={o.id}>
+                    <header>
+                      <span>
+                        <small>PEDIDO</small>
+                        <b>#{o.id}</b>
+                      </span>
+                      <span className="order-date">
+                        <small>REALIZADO EM</small>
+                        <b>
+                          {new Date(
+                            o.createdAt.replace(" ", "T") + "Z",
+                          ).toLocaleDateString("pt-BR")}
+                        </b>
+                      </span>
+                      <strong>{money(o.totalCents)}</strong>
+                      <em className={`status-${o.status}`}>
+                        {statusLabel[o.status] || o.status}
+                      </em>
+                    </header>
+                    <div className="order-progress">
+                      {[
+                        "Pedido recebido",
+                        "Pagamento",
+                        "Separação",
+                        "Envio",
+                      ].map((step, index) => (
+                        <span
+                          key={step}
+                          className={index <= progress ? "active" : ""}
+                        >
+                          <i>{index + 1}</i>
+                          <b>{step}</b>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="order-details">
+                      <div className="order-products">
+                        <small>ITENS DO PEDIDO</small>
+                        {(o.items || []).map((item) => (
+                          <div key={item.itemKey}>
+                            <span>
+                              <b>{item.name}</b>
+                              <small>
+                                {item.itemKey} • Quantidade {item.quantity}
+                              </small>
+                            </span>
+                            <strong>
+                              {money(item.unitPriceCents * item.quantity)}
+                            </strong>
+                          </div>
+                        ))}
+                      </div>
+                      <aside>
+                        <small>ENTREGA</small>
+                        <p>{o.shippingAddress || "Endereço não informado"}</p>
+                        <small>PAGAMENTO</small>
+                        <p>
+                          {o.paymentProvider === "pending_provider"
+                            ? "Integração de pagamento pendente"
+                            : o.paymentProvider}
+                        </p>
+                      </aside>
+                    </div>
+                  </section>
+                );
+              })}
             </div>
           ) : (
             <div className="account-empty-state">
