@@ -4,15 +4,13 @@ import {
   ChevronDown,
   CircleUserRound,
   Headphones,
-  Home,
   Menu,
   Search,
   ShoppingCart,
   Sparkles,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 type Props = {
   userName?: string | null;
@@ -111,18 +109,6 @@ export default function StoreHeader({
   darkTopbar = true,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [hidden, setHidden] = useState(false);
-  const pathname = usePathname();
-  useEffect(() => {
-    let previous = window.scrollY;
-    const onScroll = () => {
-      const current = window.scrollY;
-      setHidden(current > previous && current > 110);
-      previous = current;
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
   const openCart = () =>
     userName
       ? (onCart ?? (() => window.location.assign("/carrinho")))()
@@ -136,9 +122,7 @@ export default function StoreHeader({
           <span>Atendimento especialista</span>
         </div>
       )}
-      <header
-        className={`header store-header ${hidden ? "mobile-hidden" : ""}`}
-      >
+      <header className="header store-header">
         <button
           className="mobile-menu"
           onClick={() => setOpen(!open)}
@@ -174,38 +158,6 @@ export default function StoreHeader({
           </button>
         </div>
       </header>
-      <nav className="mobile-command-dock" aria-label="Atalhos principais">
-        <a className={pathname === "/" ? "active" : ""} href="/">
-          <Home />
-          <span>Início</span>
-        </a>
-        <a
-          className={pathname === "/catalogo" ? "active" : ""}
-          href="/catalogo"
-        >
-          <Sparkles />
-          <span>Catálogo</span>
-        </a>
-        <a className="command-search" href="/#compatibilidade">
-          <Search />
-          <span>Buscar</span>
-        </a>
-        <a
-          className={pathname === "/conta" ? "active" : ""}
-          href={userName ? "/conta" : "/entrar"}
-        >
-          <CircleUserRound />
-          <span>Conta</span>
-        </a>
-        <button
-          onClick={openCart}
-          aria-label={`Carrinho com ${cartCount} itens`}
-        >
-          <ShoppingCart />
-          <span>Carrinho</span>
-          {cartCount > 0 && <b>{cartCount}</b>}
-        </button>
-      </nav>
     </>
   );
 }
