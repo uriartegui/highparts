@@ -147,6 +147,15 @@ export default function ProductPage() {
     vehicle?: Vehicle;
   } | null>(null);
   useEffect(() => {
+    const recent = JSON.parse(
+      localStorage.getItem("highparts_recent") || "[]",
+    ) as string[];
+    localStorage.setItem(
+      "highparts_recent",
+      JSON.stringify(
+        [code, ...recent.filter((item) => item !== code)].slice(0, 8),
+      ),
+    );
     Promise.resolve().then(() =>
       setCartCount(
         (JSON.parse(localStorage.getItem("highparts_cart") || "[]") as string[])

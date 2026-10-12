@@ -54,6 +54,8 @@ export default function CatalogPage() {
   const [loading, setLoading] = useState(true);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
+  const [recentProducts, setRecentProducts] = useState<Product[]>([]);
+  const [addedProduct, setAddedProduct] = useState<Product | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   useEffect(() => {
     Promise.resolve().then(() =>
@@ -66,6 +68,25 @@ export default function CatalogPage() {
       .then((r) => r.json() as Promise<{ user?: { name: string } | null }>)
       .then((x) => setUserName(x.user?.name || null))
       .catch(() => {});
+    const recent = JSON.parse(
+      localStorage.getItem("highparts_recent") || "[]",
+    ) as string[];
+    if (recent.length) {
+      const params = new URLSearchParams({
+        codes: recent.slice(0, 8).join(","),
+        limit: "8",
+      });
+      fetch(`/api/catalog?${params}`)
+        .then((response) => response.json() as Promise<CatalogResponse>)
+        .then((result) =>
+          setRecentProducts(
+            recent.flatMap((code) =>
+              result.products.filter((product) => product.code === code),
+            ),
+          ),
+        )
+        .catch(() => {});
+    }
   }, []);
   useEffect(() => {
     const timer = setTimeout(async () => {
@@ -113,6 +134,7 @@ export default function CatalogPage() {
     cart.push(product.code);
     localStorage.setItem("highparts_cart", JSON.stringify(cart));
     setCartCount(cart.length);
+    setAddedProduct(product);
   }
   const pages = Math.max(1, Math.ceil(data.total / 24));
   const active = [
@@ -160,6 +182,29 @@ export default function CatalogPage() {
           </button>
         </label>
       </section>
+      {recentProducts.length > 0 && (
+        <section className="recent-products">
+          <header>
+            <small>CONTINUE DE ONDE PAROU</small>
+            <h2>Vistos recentemente</h2>
+          </header>
+          <div>
+            {recentProducts.map((product) => (
+              <a
+                href={`/produto/${encodeURIComponent(product.code)}`}
+                key={product.code}
+              >
+                <i>HP</i>
+                <span>
+                  <b>{product.product}</b>
+                  <small>{product.code}</small>
+                </span>
+                <ChevronRight />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="catalog-shell">
         <button className="filter-mobile" onClick={() => setFiltersOpen(true)}>
           <Filter /> Filtros {active.length > 0 && <b>{active.length}</b>}
@@ -380,6 +425,19 @@ export default function CatalogPage() {
           )}
         </section>
       </div>
+      {addedProduct && (
+        <aside className="mobile-cart-peek">
+          <CheckCircle2 />
+          <span>
+            <b>Adicionado ao carrinho</b>
+            <small>{addedProduct.code}</small>
+          </span>
+          <a href="/carrinho">Ver carrinho</a>
+          <button onClick={() => setAddedProduct(null)} aria-label="Fechar">
+            <X />
+          </button>
+        </aside>
+      )}
     </main>
   );
 }
