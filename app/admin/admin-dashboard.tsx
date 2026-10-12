@@ -89,6 +89,15 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState("");
+  const orderMetrics = {
+    awaiting: orders.filter((order) => order.status === "awaiting_payment")
+      .length,
+    packing: orders.filter((order) =>
+      ["paid", "processing"].includes(order.status),
+    ).length,
+    shipped: orders.filter((order) => order.status === "shipped").length,
+    completed: orders.filter((order) => order.status === "delivered").length,
+  };
   const loadProducts = async (
     q = "",
     status: InventoryFilter = inventoryFilter,
@@ -241,22 +250,53 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
           </div>
         )}
         <div className="admin-summary">
-          <Card
-            icon={<Database />}
-            label="Produtos importados"
-            value={summary.products}
-          />
-          <Card
-            icon={<PackageSearch />}
-            label="Com preço"
-            value={summary.priced}
-          />
-          <Card
-            icon={<Boxes />}
-            label="Com saldo informado"
-            value={summary.stockDefined}
-          />
-          <Card icon={<ShoppingBag />} label="Pedidos" value={summary.orders} />
+          {tab === "inventory" ? (
+            <>
+              <Card
+                icon={<Database />}
+                label="Produtos importados"
+                value={summary.products}
+              />
+              <Card
+                icon={<PackageSearch />}
+                label="Com preço"
+                value={summary.priced}
+              />
+              <Card
+                icon={<Boxes />}
+                label="Com saldo informado"
+                value={summary.stockDefined}
+              />
+              <Card
+                icon={<ShoppingBag />}
+                label="Pedidos"
+                value={summary.orders}
+              />
+            </>
+          ) : (
+            <>
+              <Card
+                icon={<ShoppingBag />}
+                label="Aguardando pagamento"
+                value={orderMetrics.awaiting}
+              />
+              <Card
+                icon={<ClipboardCheck />}
+                label="Para separar"
+                value={orderMetrics.packing}
+              />
+              <Card
+                icon={<Truck />}
+                label="Em transporte"
+                value={orderMetrics.shipped}
+              />
+              <Card
+                icon={<Check />}
+                label="Entregues"
+                value={orderMetrics.completed}
+              />
+            </>
+          )}
         </div>
         {tab === "inventory" ? (
           <Inventory
@@ -420,6 +460,8 @@ function Orders({
     },
   ) => Promise<boolean>;
 }) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("open");
   const [selected, setSelected] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<
     Record<
@@ -452,200 +494,272 @@ function Orders({
       ...current,
       [order.id]: { ...draftFor(order), ...current[order.id], ...change },
     }));
+  const normalizedQuery = query.trim().toLocaleLowerCase("pt-BR");
+  const visibleOrders = orders.filter((order) => {
+    const matchesFilter =
+      filter === "all" ||
+      (filter === "open"
+        ? !["delivered", "cancelled"].includes(order.status)
+        : filter === "packing"
+          ? ["paid", "processing"].includes(order.status)
+          : order.status === filter);
+    const matchesQuery =
+      !normalizedQuery ||
+      [
+        order.id,
+        order.customerName,
+        order.customerEmail,
+        order.customerPhone,
+        order.trackingCode,
+      ].some((value) =>
+        String(value || "")
+          .toLocaleLowerCase("pt-BR")
+          .includes(normalizedQuery),
+      );
+    return matchesFilter && matchesQuery;
+  });
   return (
     <div className="inventory admin-orders">
       {loading ? (
         <Loading />
       ) : orders.length ? (
-        <div className="fulfillment-list">
-          {orders.map((order) => {
-            const draft = draftFor(order);
-            const opened = selected === order.id;
-            const packedCount = draft.packedItems.length;
-            return (
-              <article
-                className={`fulfillment-order ${opened ? "open" : ""}`}
-                key={order.id}
-              >
+        <>
+          <div className="order-operations-toolbar">
+            <div className="admin-search">
+              <Search />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar pedido, cliente, telefone ou rastreio"
+                aria-label="Buscar pedidos"
+              />
+            </div>
+            <div className="inventory-filters">
+              {[
+                ["open", "Em aberto"],
+                ["all", "Todos"],
+                ["awaiting_payment", "Aguardando"],
+                ["packing", "Separação"],
+                ["shipped", "Enviados"],
+                ["delivered", "Entregues"],
+                ["cancelled", "Cancelados"],
+              ].map(([value, label]) => (
                 <button
-                  className="fulfillment-summary"
-                  onClick={() => setSelected(opened ? null : order.id)}
+                  key={value}
+                  className={filter === value ? "active" : ""}
+                  onClick={() => setFilter(value)}
                 >
-                  <span>
-                    <small>PEDIDO</small>
-                    <b>{order.id}</b>
-                  </span>
-                  <span>
-                    <small>CLIENTE</small>
-                    <b>{order.customerName}</b>
-                    <em>{order.customerEmail}</em>
-                  </span>
-                  <span>
-                    <small>SEPARAÇÃO</small>
-                    <b>
-                      {packedCount}/{order.items.length} itens
-                    </b>
-                  </span>
-                  <span>
-                    <small>TOTAL</small>
-                    <b>{money(order.totalCents)}</b>
-                  </span>
-                  <i className={`status-${order.status}`}>
-                    {statusLabels[order.status] || order.status}
-                  </i>
+                  {label}
                 </button>
-                {opened && (
-                  <div className="fulfillment-body">
-                    <div className="fulfillment-customer">
-                      <section>
-                        <MapPin />
-                        <span>
-                          <small>ENTREGA</small>
-                          <b>
-                            {order.shippingAddress || "Endereço não informado"}
-                          </b>
-                        </span>
-                      </section>
-                      <section>
-                        <ShoppingBag />
-                        <span>
-                          <small>CONTATO</small>
-                          <b>{order.customerPhone || "Sem telefone"}</b>
-                          <em>{order.customerEmail}</em>
-                        </span>
-                      </section>
-                    </div>
-                    <div className="packing-checklist">
-                      <header>
-                        <ClipboardCheck />
-                        <span>
-                          <small>CHECKLIST</small>
-                          <h3>Separação das peças</h3>
-                        </span>
+              ))}
+            </div>
+            <span>
+              {visibleOrders.length}{" "}
+              {visibleOrders.length === 1 ? "pedido" : "pedidos"}
+            </span>
+          </div>
+          {visibleOrders.length ? (
+            <div className="fulfillment-list">
+              {visibleOrders.map((order) => {
+                const draft = draftFor(order);
+                const opened = selected === order.id;
+                const packedCount = draft.packedItems.length;
+                return (
+                  <article
+                    className={`fulfillment-order ${opened ? "open" : ""}`}
+                    key={order.id}
+                  >
+                    <button
+                      className="fulfillment-summary"
+                      onClick={() => setSelected(opened ? null : order.id)}
+                    >
+                      <span>
+                        <small>PEDIDO</small>
+                        <b>{order.id}</b>
+                      </span>
+                      <span>
+                        <small>CLIENTE</small>
+                        <b>{order.customerName}</b>
+                        <em>{order.customerEmail}</em>
+                      </span>
+                      <span>
+                        <small>SEPARAÇÃO</small>
                         <b>
-                          {packedCount}/{order.items.length}
+                          {packedCount}/{order.items.length} itens
                         </b>
-                      </header>
-                      {order.items.map((item) => (
-                        <label key={item.itemKey}>
-                          <input
-                            type="checkbox"
-                            checked={draft.packedItems.includes(item.itemKey)}
-                            onChange={(event) =>
-                              patchDraft(order, {
-                                packedItems: event.target.checked
-                                  ? [...draft.packedItems, item.itemKey]
-                                  : draft.packedItems.filter(
-                                      (code) => code !== item.itemKey,
-                                    ),
-                              })
-                            }
-                          />
-                          <span>
-                            <b>{item.name}</b>
-                            <small>
-                              {item.itemKey} • {item.quantity}{" "}
-                              {item.quantity === 1 ? "unidade" : "unidades"}
-                            </small>
-                          </span>
-                          <strong>
-                            {money(item.unitPriceCents * item.quantity)}
-                          </strong>
-                        </label>
-                      ))}
-                    </div>
-                    <div className="shipping-editor">
-                      <header>
-                        <Truck />
-                        <span>
-                          <small>EXPEDIÇÃO</small>
-                          <h3>Envio e rastreamento</h3>
-                        </span>
-                      </header>
-                      <div>
-                        <label>
-                          Transportadora
-                          <input
-                            value={draft.shippingCarrier}
-                            onChange={(e) =>
-                              patchDraft(order, {
-                                shippingCarrier: e.target.value,
-                              })
-                            }
-                            placeholder="Ex.: Correios, Jadlog"
-                          />
-                        </label>
-                        <label>
-                          Serviço
-                          <input
-                            value={draft.shippingService}
-                            onChange={(e) =>
-                              patchDraft(order, {
-                                shippingService: e.target.value,
-                              })
-                            }
-                            placeholder="Ex.: PAC, Expresso"
-                          />
-                        </label>
-                        <label>
-                          Código de rastreio
-                          <input
-                            value={draft.trackingCode}
-                            onChange={(e) =>
-                              patchDraft(order, {
-                                trackingCode: e.target.value.toUpperCase(),
-                              })
-                            }
-                            placeholder="Código fornecido pela transportadora"
-                          />
-                        </label>
-                        <label>
-                          Status
-                          <select
-                            value={draft.status}
-                            disabled={order.status === "cancelled"}
-                            onChange={(e) =>
-                              patchDraft(order, { status: e.target.value })
-                            }
+                      </span>
+                      <span>
+                        <small>TOTAL</small>
+                        <b>{money(order.totalCents)}</b>
+                      </span>
+                      <i className={`status-${order.status}`}>
+                        {statusLabels[order.status] || order.status}
+                      </i>
+                    </button>
+                    {opened && (
+                      <div className="fulfillment-body">
+                        <div className="fulfillment-customer">
+                          <section>
+                            <MapPin />
+                            <span>
+                              <small>ENTREGA</small>
+                              <b>
+                                {order.shippingAddress ||
+                                  "Endereço não informado"}
+                              </b>
+                            </span>
+                          </section>
+                          <section>
+                            <ShoppingBag />
+                            <span>
+                              <small>CONTATO</small>
+                              <b>{order.customerPhone || "Sem telefone"}</b>
+                              <em>{order.customerEmail}</em>
+                            </span>
+                          </section>
+                        </div>
+                        <div className="packing-checklist">
+                          <header>
+                            <ClipboardCheck />
+                            <span>
+                              <small>CHECKLIST</small>
+                              <h3>Separação das peças</h3>
+                            </span>
+                            <b>
+                              {packedCount}/{order.items.length}
+                            </b>
+                          </header>
+                          {order.items.map((item) => (
+                            <label key={item.itemKey}>
+                              <input
+                                type="checkbox"
+                                checked={draft.packedItems.includes(
+                                  item.itemKey,
+                                )}
+                                onChange={(event) =>
+                                  patchDraft(order, {
+                                    packedItems: event.target.checked
+                                      ? [...draft.packedItems, item.itemKey]
+                                      : draft.packedItems.filter(
+                                          (code) => code !== item.itemKey,
+                                        ),
+                                  })
+                                }
+                              />
+                              <span>
+                                <b>{item.name}</b>
+                                <small>
+                                  {item.itemKey} • {item.quantity}{" "}
+                                  {item.quantity === 1 ? "unidade" : "unidades"}
+                                </small>
+                              </span>
+                              <strong>
+                                {money(item.unitPriceCents * item.quantity)}
+                              </strong>
+                            </label>
+                          ))}
+                        </div>
+                        <div className="shipping-editor">
+                          <header>
+                            <Truck />
+                            <span>
+                              <small>EXPEDIÇÃO</small>
+                              <h3>Envio e rastreamento</h3>
+                            </span>
+                          </header>
+                          <div>
+                            <label>
+                              Transportadora
+                              <input
+                                value={draft.shippingCarrier}
+                                onChange={(e) =>
+                                  patchDraft(order, {
+                                    shippingCarrier: e.target.value,
+                                  })
+                                }
+                                placeholder="Ex.: Correios, Jadlog"
+                              />
+                            </label>
+                            <label>
+                              Serviço
+                              <input
+                                value={draft.shippingService}
+                                onChange={(e) =>
+                                  patchDraft(order, {
+                                    shippingService: e.target.value,
+                                  })
+                                }
+                                placeholder="Ex.: PAC, Expresso"
+                              />
+                            </label>
+                            <label>
+                              Código de rastreio
+                              <input
+                                value={draft.trackingCode}
+                                onChange={(e) =>
+                                  patchDraft(order, {
+                                    trackingCode: e.target.value.toUpperCase(),
+                                  })
+                                }
+                                placeholder="Código fornecido pela transportadora"
+                              />
+                            </label>
+                            <label>
+                              Status
+                              <select
+                                value={draft.status}
+                                disabled={order.status === "cancelled"}
+                                onChange={(e) =>
+                                  patchDraft(order, { status: e.target.value })
+                                }
+                              >
+                                {Object.entries(statusLabels).map(
+                                  ([value, label]) => (
+                                    <option value={value} key={value}>
+                                      {label}
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+                            </label>
+                          </div>
+                          <button
+                            disabled={saving}
+                            onClick={async () => {
+                              setSaving(true);
+                              const ok = await updateOrder(order, draft);
+                              setSaving(false);
+                              if (ok)
+                                setDrafts((current) => {
+                                  const next = { ...current };
+                                  delete next[order.id];
+                                  return next;
+                                });
+                            }}
                           >
-                            {Object.entries(statusLabels).map(
-                              ([value, label]) => (
-                                <option value={value} key={value}>
-                                  {label}
-                                </option>
-                              ),
-                            )}
-                          </select>
-                        </label>
+                            <Save />
+                            {saving ? "Salvando..." : "Salvar andamento"}
+                          </button>
+                          <small>
+                            Ao mudar o status, o cliente será avisado por
+                            e-mail. Cancelamentos devolvem as quantidades ao
+                            estoque.
+                          </small>
+                        </div>
                       </div>
-                      <button
-                        disabled={saving}
-                        onClick={async () => {
-                          setSaving(true);
-                          const ok = await updateOrder(order, draft);
-                          setSaving(false);
-                          if (ok)
-                            setDrafts((current) => {
-                              const next = { ...current };
-                              delete next[order.id];
-                              return next;
-                            });
-                        }}
-                      >
-                        <Save />
-                        {saving ? "Salvando..." : "Salvar andamento"}
-                      </button>
-                      <small>
-                        Ao mudar o status, o cliente será avisado por e-mail.
-                        Cancelamentos devolvem as quantidades ao estoque.
-                      </small>
-                    </div>
-                  </div>
-                )}
-              </article>
-            );
-          })}
-        </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="admin-empty order-empty">
+              <PackageSearch />
+              <h2>Nenhum pedido encontrado</h2>
+              <p>Altere a busca ou escolha outro filtro de andamento.</p>
+            </div>
+          )}
+        </>
       ) : (
         <div className="admin-empty">
           <ShoppingBag />
