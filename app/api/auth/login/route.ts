@@ -12,8 +12,9 @@ export async function POST(request: Request) {
   const fieldErrors: Record<string, string> = {};
   if (!/^\S+@\S+\.\S+$/.test(email)) fieldErrors.email = "Informe um e-mail válido.";
   if (!password) fieldErrors.password = "Informe sua senha.";
-  if (!await verifyTurnstile(request, input.turnstileToken)) fieldErrors.turnstile = "Confirme que você não é um robô.";
   if (Object.keys(fieldErrors).length) return Response.json({ fieldErrors }, { status: 400 });
+  // Checked only after the cheap field validation so a typo does not burn the single-use token.
+  if (!await verifyTurnstile(request, input.turnstileToken)) return Response.json({ fieldErrors: { turnstile: "Confirme que você não é um robô." } }, { status: 400 });
 
   const limiter = await env.DB.prepare("SELECT attempts,window_started_at AS windowStartedAt,locked_until AS lockedUntil FROM login_attempts WHERE email=?").bind(email).first<{ attempts: number; windowStartedAt: string; lockedUntil: string | null }>();
   if (limiter?.lockedUntil && new Date(limiter.lockedUntil).getTime() > Date.now()) {

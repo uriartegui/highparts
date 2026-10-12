@@ -18,11 +18,14 @@ export async function POST(request: Request) {
   if (password.length < 10) fieldErrors.password = "A senha deve ter pelo menos 10 caracteres.";
   else if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) fieldErrors.password = "Use pelo menos uma letra e um número.";
   if (password !== (input.confirmPassword ?? "")) fieldErrors.confirmPassword = "As senhas não coincidem.";
-  if (!await verifyTurnstile(request, input.turnstileToken)) fieldErrors.turnstile = "Confirme que você não é um robô.";
+  if (Object.keys(fieldErrors).length) return Response.json({ fieldErrors }, { status: 400 });
+  // Checked after format validation (so a typo does not burn the single-use token)
+  // but before the duplicate lookups, so bots cannot enumerate existing accounts.
+  if (!await verifyTurnstile(request, input.turnstileToken)) return Response.json({ fieldErrors: { turnstile: "Confirme que você não é um robô." } }, { status: 400 });
 
   const [emailOwner, phoneOwner] = await Promise.all([
-    email && !fieldErrors.email ? env.DB.prepare("SELECT id FROM users WHERE email=?").bind(email).first() : null,
-    phone && !fieldErrors.phone ? env.DB.prepare("SELECT id FROM users WHERE phone=?").bind(phone).first() : null,
+    env.DB.prepare("SELECT id FROM users WHERE email=?").bind(email).first(),
+    env.DB.prepare("SELECT id FROM users WHERE phone=?").bind(phone).first(),
   ]);
   if (emailOwner) fieldErrors.email = "Este e-mail já possui uma conta.";
   if (phoneOwner) fieldErrors.phone = "Este telefone já possui uma conta.";
