@@ -5,7 +5,7 @@ import { createMercadoPagoPreference, mercadoPagoConfigured } from "../../../../
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (!user) return Response.json({ error: "Não autorizado." }, { status: 401 });
-  if (!mercadoPagoConfigured())
+  if (!mercadoPagoConfigured(request))
     return Response.json({ error: "Pagamento ainda não configurado." }, { status: 503 });
   const { id } = await context.params;
   const order = await env.DB.prepare(
@@ -31,7 +31,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     items: items.results as Array<{ code: string; name: string; quantity: number; unitPriceCents: number }>,
   });
   await env.DB.prepare(
-    "UPDATE orders SET payment_provider='mercado_pago',payment_reference=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-  ).bind(preference.id, id).run();
+    "UPDATE orders SET payment_provider='mercado_pago',payment_reference=?,payment_mode=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+  ).bind(preference.id, preference.mode, id).run();
   return Response.json({ checkoutUrl: preference.checkoutUrl });
 }

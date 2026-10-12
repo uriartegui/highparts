@@ -175,7 +175,7 @@ export async function POST(request: Request) {
     checkoutUrl?: string;
     message?: string;
   } = {
-    configured: mercadoPagoConfigured(),
+    configured: mercadoPagoConfigured(request),
     message: "Pedido salvo. Não foi possível abrir o pagamento agora.",
   };
   if (payment.configured) {
@@ -192,8 +192,8 @@ export async function POST(request: Request) {
         })),
       });
       await env.DB.prepare(
-        "UPDATE orders SET payment_provider='mercado_pago',payment_reference=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-      ).bind(preference.id, id).run();
+        "UPDATE orders SET payment_provider='mercado_pago',payment_reference=?,payment_mode=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+      ).bind(preference.id, preference.mode, id).run();
       payment = { configured: true, checkoutUrl: preference.checkoutUrl };
     } catch (error) {
       console.error("order_payment_preference_failed", id, error);

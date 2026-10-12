@@ -1,27 +1,44 @@
 import { env } from "cloudflare:workers";
 
 type MercadoPagoEnv = {
+  MERCADO_PAGO_ENV?: string;
   MERCADO_PAGO_ACCESS_TOKEN_TEST?: string;
   MERCADO_PAGO_ACCESS_TOKEN?: string;
   MERCADO_PAGO_WEBHOOK_SECRET?: string;
 };
 
+export type MercadoPagoMode = "production" | "test";
+
+// Live storefront hostnames. Test (sandbox) checkout is never offered here, so
+// real customers cannot be sent to a sandbox and "pay" with test cards.
+const PRODUCTION_HOSTS = new Set(["highparts.com.br", "www.highparts.com.br"]);
+
 export type CheckoutItem = { code: string; name: string; quantity: number; unitPriceCents: number };
 type PreferenceResponse = { id?: string; init_point?: string; sandbox_init_point?: string; message?: string };
-type PaymentResponse = { id?: number; status?: string; external_reference?: string; transaction_amount?: number; currency_id?: string };
+type PaymentResponse = { id?: number; status?: string; external_reference?: string; transaction_amount?: number; currency_id?: string; live_mode?: boolean };
 
 function paymentEnv() {
   return env as unknown as MercadoPagoEnv;
 }
 
-export function mercadoPagoConfigured() {
-  const current = paymentEnv();
-  return Boolean(current.MERCADO_PAGO_ACCESS_TOKEN_TEST || current.MERCADO_PAGO_ACCESS_TOKEN);
+// Mode is explicit: only MERCADO_PAGO_ENV=production uses live credentials.
+// Anything else is test mode, which uses only the TEST token. Tokens are never
+// mixed, so a test token can't silently serve production or vice versa.
+export function mercadoPagoMode(): MercadoPagoMode {
+  return paymentEnv().MERCADO_PAGO_ENV === "production" ? "production" : "test";
 }
 
 function accessToken() {
   const current = paymentEnv();
-  return current.MERCADO_PAGO_ACCESS_TOKEN_TEST || current.MERCADO_PAGO_ACCESS_TOKEN;
+  return mercadoPagoMode() === "production"
+    ? current.MERCADO_PAGO_ACCESS_TOKEN
+    : current.MERCADO_PAGO_ACCESS_TOKEN_TEST;
+}
+
+export function mercadoPagoConfigured(request: Request) {
+  if (!accessToken()) return false;
+  if (mercadoPagoMode() === "test" && PRODUCTION_HOSTS.has(new URL(request.url).hostname)) return false;
+  return true;
 }
 
 function publicOrigin(request: Request) {
@@ -36,7 +53,8 @@ export async function createMercadoPagoPreference(input: {
   items: CheckoutItem[];
 }) {
   const token = accessToken();
-  if (!token) throw new Error("MERCADO_PAGO_NOT_CONFIGURED");
+  if (!token || !mercadoPagoConfigured(input.request)) throw new Error("MERCADO_PAGO_NOT_CONFIGURED");
+  const mode = mercadoPagoMode();
   const origin = publicOrigin(input.request);
   const returnUrl = origin + "/pagamento/retorno?pedido=" + encodeURIComponent(input.orderId);
   const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
@@ -67,11 +85,12 @@ export async function createMercadoPagoPreference(input: {
     }),
   });
   const body = (await response.json().catch(() => ({}))) as PreferenceResponse;
-  if (!response.ok || !body.id || (!body.init_point && !body.sandbox_init_point)) {
+  const checkoutUrl = mode === "production" ? body.init_point : body.sandbox_init_point;
+  if (!response.ok || !body.id || !checkoutUrl) {
     console.error("mercado_pago_preference_failed", response.status, body.message);
     throw new Error("MERCADO_PAGO_PREFERENCE_FAILED");
   }
-  return { id: body.id, checkoutUrl: body.sandbox_init_point || body.init_point! };
+  return { id: body.id, checkoutUrl, mode };
 }
 
 export async function getMercadoPagoPayment(id: string) {
