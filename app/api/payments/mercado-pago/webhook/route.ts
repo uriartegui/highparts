@@ -51,7 +51,11 @@ export async function POST(request: Request) {
       "mercado_pago",
       dataId,
       payment.status,
-      JSON.stringify(payment),
+      JSON.stringify({
+        status: payment.status,
+        amountCents: receivedCents,
+        currency: payment.currency_id,
+      }),
     ),
   ]);
   return Response.json({ ok: true });
