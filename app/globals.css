@@ -169,9 +169,9 @@ body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}::sele
   .catalog-shell>aside h2{font-size:25px;margin:5px 0 0;letter-spacing:-.04em}
   .catalog-shell>aside header button{width:38px;height:38px;border-radius:50%;background:#f2f3f5;place-items:center}
   .catalog-shell>aside header button svg{width:18px}
-  .filter-block{padding:15px 0}
+  .filter-block{width:100%;padding:15px 0}
   .filter-block>b{font-size:11px;margin-bottom:9px}
-  .filter-block select{height:50px;border:1px solid #e5e7ea;border-radius:13px;background:#f7f7f9;padding:0 13px;font-size:11px}
+  .filter-block select{display:block;width:100%;min-width:100%;height:50px;border:1px solid #e5e7ea;border-radius:13px;background:#f7f7f9;padding:0 13px;font-size:11px}
   .availability{min-height:58px;padding:16px 2px}
   .availability b{font-size:10px}
   .clear-filters{display:none}
