@@ -7,7 +7,9 @@ export async function GET() {
   const [orders, items] = await Promise.all([
     env.DB.prepare(
       `SELECT o.id,o.total_cents AS totalCents,o.status,o.payment_provider AS paymentProvider,
-    o.vehicle_plate AS vehiclePlate,o.shipping_address AS shippingAddress,o.created_at AS createdAt,
+    o.vehicle_plate AS vehiclePlate,o.shipping_address AS shippingAddress,
+    o.shipping_carrier AS shippingCarrier,o.shipping_service AS shippingService,
+    o.tracking_code AS trackingCode,o.shipped_at AS shippedAt,o.created_at AS createdAt,
     COALESCE((SELECT SUM(i.quantity) FROM order_snapshot_items i WHERE i.order_id=o.id),0) AS itemCount
     FROM orders o WHERE o.user_id=? ORDER BY o.created_at DESC`,
     )

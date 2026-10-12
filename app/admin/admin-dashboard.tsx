@@ -6,13 +6,16 @@ import {
   Check,
   ChevronLeft,
   Database,
+  ClipboardCheck,
   LoaderCircle,
+  MapPin,
   PackageSearch,
   RefreshCw,
   Save,
   Search,
   ShieldCheck,
   ShoppingBag,
+  Truck,
 } from "lucide-react";
 
 type Product = {
@@ -42,6 +45,18 @@ type Order = {
   paymentProvider: string;
   createdAt: string;
   itemCount: number;
+  shippingAddress: string;
+  shippingCarrier: string;
+  shippingService: string;
+  trackingCode: string;
+  shippedAt: string | null;
+  items: Array<{
+    itemKey: string;
+    name: string;
+    unitPriceCents: number;
+    quantity: number;
+    packed: number;
+  }>;
 };
 type Tab = "inventory" | "orders";
 type InventoryFilter = "all" | "missing-price" | "missing-stock" | "ready";
@@ -139,19 +154,32 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
     );
     if (r.ok) loadProducts(query);
   };
-  const updateStatus = async (order: Order, status: string) => {
+  const updateOrder = async (
+    order: Order,
+    changes: {
+      status: string;
+      shippingCarrier: string;
+      shippingService: string;
+      trackingCode: string;
+      packedItems: string[];
+    },
+  ) => {
     const r = await fetch(`/api/admin/orders/${encodeURIComponent(order.id)}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(changes),
     });
+    const result = (await r.json().catch(() => ({}))) as {
+      error?: string;
+      emailSent?: boolean;
+    };
     setMessage(
       r.ok
-        ? `Pedido ${order.id} atualizado.`
-        : "Não foi possível atualizar o pedido.",
+        ? `Pedido ${order.id} atualizado${result.emailSent ? " e cliente avisado por e-mail" : ""}.`
+        : result.error || "Não foi possível atualizar o pedido.",
     );
-    if (r.ok)
-      setOrders(orders.map((o) => (o.id === order.id ? { ...o, status } : o)));
+    if (r.ok) await loadOrders();
+    return r.ok;
   };
   return (
     <main className="real-admin">
@@ -246,11 +274,7 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
             save={save}
           />
         ) : (
-          <Orders
-            orders={orders}
-            loading={loading}
-            updateStatus={updateStatus}
-          />
+          <Orders orders={orders} loading={loading} updateOrder={updateOrder} />
         )}
       </section>
     </main>
@@ -381,72 +405,246 @@ function Inventory({
 function Orders({
   orders,
   loading,
-  updateStatus,
+  updateOrder,
 }: {
   orders: Order[];
   loading: boolean;
-  updateStatus: (order: Order, status: string) => void;
+  updateOrder: (
+    order: Order,
+    changes: {
+      status: string;
+      shippingCarrier: string;
+      shippingService: string;
+      trackingCode: string;
+      packedItems: string[];
+    },
+  ) => Promise<boolean>;
 }) {
+  const [selected, setSelected] = useState<string | null>(null);
+  const [drafts, setDrafts] = useState<
+    Record<
+      string,
+      {
+        status: string;
+        shippingCarrier: string;
+        shippingService: string;
+        trackingCode: string;
+        packedItems: string[];
+      }
+    >
+  >({});
+  const [saving, setSaving] = useState(false);
+  const draftFor = (order: Order) =>
+    drafts[order.id] || {
+      status: order.status,
+      shippingCarrier: order.shippingCarrier || "",
+      shippingService: order.shippingService || "",
+      trackingCode: order.trackingCode || "",
+      packedItems: order.items
+        .filter((item) => item.packed)
+        .map((item) => item.itemKey),
+    };
+  const patchDraft = (
+    order: Order,
+    change: Partial<ReturnType<typeof draftFor>>,
+  ) =>
+    setDrafts((current) => ({
+      ...current,
+      [order.id]: { ...draftFor(order), ...current[order.id], ...change },
+    }));
   return (
     <div className="inventory admin-orders">
       {loading ? (
         <Loading />
       ) : orders.length ? (
-        <div className="inventory-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Pedido</th>
-                <th>Cliente</th>
-                <th>Itens</th>
-                <th>Total</th>
-                <th>Data</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.map((order) => (
-                <tr key={order.id}>
-                  <td>
+        <div className="fulfillment-list">
+          {orders.map((order) => {
+            const draft = draftFor(order);
+            const opened = selected === order.id;
+            const packedCount = draft.packedItems.length;
+            return (
+              <article
+                className={`fulfillment-order ${opened ? "open" : ""}`}
+                key={order.id}
+              >
+                <button
+                  className="fulfillment-summary"
+                  onClick={() => setSelected(opened ? null : order.id)}
+                >
+                  <span>
+                    <small>PEDIDO</small>
                     <b>{order.id}</b>
-                    <small>{order.paymentProvider}</small>
-                  </td>
-                  <td>
+                  </span>
+                  <span>
+                    <small>CLIENTE</small>
                     <b>{order.customerName}</b>
-                    <small>
-                      {order.customerEmail}
-                      <br />
-                      {order.customerPhone}
-                    </small>
-                  </td>
-                  <td>{order.itemCount}</td>
-                  <td>
+                    <em>{order.customerEmail}</em>
+                  </span>
+                  <span>
+                    <small>SEPARAÇÃO</small>
+                    <b>
+                      {packedCount}/{order.items.length} itens
+                    </b>
+                  </span>
+                  <span>
+                    <small>TOTAL</small>
                     <b>{money(order.totalCents)}</b>
-                  </td>
-                  <td>
-                    {new Date(
-                      order.createdAt.replace(" ", "T") + "Z",
-                    ).toLocaleString("pt-BR", {
-                      dateStyle: "short",
-                      timeStyle: "short",
-                    })}
-                  </td>
-                  <td>
-                    <select
-                      value={order.status}
-                      onChange={(e) => updateStatus(order, e.target.value)}
-                    >
-                      {Object.entries(statusLabels).map(([value, label]) => (
-                        <option value={value} key={value}>
-                          {label}
-                        </option>
+                  </span>
+                  <i className={`status-${order.status}`}>
+                    {statusLabels[order.status] || order.status}
+                  </i>
+                </button>
+                {opened && (
+                  <div className="fulfillment-body">
+                    <div className="fulfillment-customer">
+                      <section>
+                        <MapPin />
+                        <span>
+                          <small>ENTREGA</small>
+                          <b>
+                            {order.shippingAddress || "Endereço não informado"}
+                          </b>
+                        </span>
+                      </section>
+                      <section>
+                        <ShoppingBag />
+                        <span>
+                          <small>CONTATO</small>
+                          <b>{order.customerPhone || "Sem telefone"}</b>
+                          <em>{order.customerEmail}</em>
+                        </span>
+                      </section>
+                    </div>
+                    <div className="packing-checklist">
+                      <header>
+                        <ClipboardCheck />
+                        <span>
+                          <small>CHECKLIST</small>
+                          <h3>Separação das peças</h3>
+                        </span>
+                        <b>
+                          {packedCount}/{order.items.length}
+                        </b>
+                      </header>
+                      {order.items.map((item) => (
+                        <label key={item.itemKey}>
+                          <input
+                            type="checkbox"
+                            checked={draft.packedItems.includes(item.itemKey)}
+                            onChange={(event) =>
+                              patchDraft(order, {
+                                packedItems: event.target.checked
+                                  ? [...draft.packedItems, item.itemKey]
+                                  : draft.packedItems.filter(
+                                      (code) => code !== item.itemKey,
+                                    ),
+                              })
+                            }
+                          />
+                          <span>
+                            <b>{item.name}</b>
+                            <small>
+                              {item.itemKey} • {item.quantity}{" "}
+                              {item.quantity === 1 ? "unidade" : "unidades"}
+                            </small>
+                          </span>
+                          <strong>
+                            {money(item.unitPriceCents * item.quantity)}
+                          </strong>
+                        </label>
                       ))}
-                    </select>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </div>
+                    <div className="shipping-editor">
+                      <header>
+                        <Truck />
+                        <span>
+                          <small>EXPEDIÇÃO</small>
+                          <h3>Envio e rastreamento</h3>
+                        </span>
+                      </header>
+                      <div>
+                        <label>
+                          Transportadora
+                          <input
+                            value={draft.shippingCarrier}
+                            onChange={(e) =>
+                              patchDraft(order, {
+                                shippingCarrier: e.target.value,
+                              })
+                            }
+                            placeholder="Ex.: Correios, Jadlog"
+                          />
+                        </label>
+                        <label>
+                          Serviço
+                          <input
+                            value={draft.shippingService}
+                            onChange={(e) =>
+                              patchDraft(order, {
+                                shippingService: e.target.value,
+                              })
+                            }
+                            placeholder="Ex.: PAC, Expresso"
+                          />
+                        </label>
+                        <label>
+                          Código de rastreio
+                          <input
+                            value={draft.trackingCode}
+                            onChange={(e) =>
+                              patchDraft(order, {
+                                trackingCode: e.target.value.toUpperCase(),
+                              })
+                            }
+                            placeholder="Código fornecido pela transportadora"
+                          />
+                        </label>
+                        <label>
+                          Status
+                          <select
+                            value={draft.status}
+                            disabled={order.status === "cancelled"}
+                            onChange={(e) =>
+                              patchDraft(order, { status: e.target.value })
+                            }
+                          >
+                            {Object.entries(statusLabels).map(
+                              ([value, label]) => (
+                                <option value={value} key={value}>
+                                  {label}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </label>
+                      </div>
+                      <button
+                        disabled={saving}
+                        onClick={async () => {
+                          setSaving(true);
+                          const ok = await updateOrder(order, draft);
+                          setSaving(false);
+                          if (ok)
+                            setDrafts((current) => {
+                              const next = { ...current };
+                              delete next[order.id];
+                              return next;
+                            });
+                        }}
+                      >
+                        <Save />
+                        {saving ? "Salvando..." : "Salvar andamento"}
+                      </button>
+                      <small>
+                        Ao mudar o status, o cliente será avisado por e-mail.
+                        Cancelamentos devolvem as quantidades ao estoque.
+                      </small>
+                    </div>
+                  </div>
+                )}
+              </article>
+            );
+          })}
         </div>
       ) : (
         <div className="admin-empty">

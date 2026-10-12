@@ -31,6 +31,10 @@ type Order = {
   paymentProvider: string;
   vehiclePlate: string;
   shippingAddress: string;
+  shippingCarrier: string;
+  shippingService: string;
+  trackingCode: string;
+  shippedAt: string | null;
   createdAt: string;
   itemCount: number;
   items: Array<{
@@ -592,6 +596,18 @@ export default function AccountDashboard({ user }: { user: User }) {
                       <aside>
                         <small>ENTREGA</small>
                         <p>{o.shippingAddress || "Endereço não informado"}</p>
+                        {o.trackingCode ? (
+                          <>
+                            <small>RASTREAMENTO</small>
+                            <p>
+                              <b>{o.trackingCode}</b>
+                              <br />
+                              {[o.shippingCarrier, o.shippingService]
+                                .filter(Boolean)
+                                .join(" • ")}
+                            </p>
+                          </>
+                        ) : null}
                         <small>PAGAMENTO</small>
                         <p>
                           {o.paymentProvider === "pending_provider"
