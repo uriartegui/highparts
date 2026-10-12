@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useState } from "react";
+import { FormEvent, useCallback, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import TurnstileWidget from "../turnstile-widget";
@@ -24,7 +24,7 @@ function formatPhone(value: string) {
   return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
 }
 
-export default function LoginPage() {
+function LoginPageContent() {
   const params = useSearchParams();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [error, setError] = useState("");
@@ -67,4 +67,9 @@ export default function LoginPage() {
       {mode === "login" && <a className="forgot-link" href="/esqueci-senha">Esqueci minha senha</a>}<TurnstileWidget onToken={onTurnstile}/>{fieldErrors.turnstile&&<small className="field-error">{fieldErrors.turnstile}</small>}{error && <p className="auth-error">{error}</p>}<button className="auth-submit" disabled={loading}>{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar minha conta"}</button>
     </form><div className="auth-secure"><ShieldCheck /><span><b>Sessão protegida</b><small>Senha criptografada e cookie seguro.</small></span></div>
   </section></main>;
+}
+
+// useSearchParams() must render inside a Suspense boundary (required by vinext/Next).
+export default function LoginPage() {
+  return <Suspense fallback={null}><LoginPageContent /></Suspense>;
 }

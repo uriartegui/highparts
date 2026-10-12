@@ -12,7 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import StoreHeader from "../store-header";
 
 type Product = {
@@ -36,7 +36,7 @@ const featuredCategories = [
   "CILINDRO MESTRE",
 ];
 
-export default function CatalogPage() {
+function CatalogPageContent() {
   const initial = useSearchParams();
   const [query, setQuery] = useState(initial.get("q") || "");
   const [category, setCategory] = useState(initial.get("categoria") || "");
@@ -494,4 +494,9 @@ function FilterSelect({
       </select>
     </label>
   );
+}
+
+// useSearchParams() must render inside a Suspense boundary (required by vinext/Next).
+export default function CatalogPage() {
+  return <Suspense fallback={null}><CatalogPageContent /></Suspense>;
 }
