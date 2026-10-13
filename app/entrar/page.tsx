@@ -4,6 +4,8 @@ import { FormEvent, useCallback, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import TurnstileWidget from "../turnstile-widget";
+import SiteShell from "../site-shell";
+import { AuthLayout } from "../ui";
 
 // Only same-origin paths are allowed; "/\evil.com" and "//evil.com" resolve to
 // other hosts in browsers, so validate the resolved origin instead of the prefix.
@@ -58,7 +60,7 @@ function LoginPageContent() {
     window.location.href = safeReturnPath(requested);
   }
 
-  return <main className="auth-page"><a href="/"><img src="/highparts-logo.png" alt="HighParts" /></a><section>
+  return <AuthLayout>
     <div className="auth-heading"><small>CONTA HIGHPARTS</small><h1>{mode === "login" ? "Bem-vindo de volta." : "Crie sua conta."}</h1><p>Carrinho, veículos e pedidos ficam salvos com segurança.</p></div>
     <div className="auth-tabs"><button className={mode === "login" ? "active" : ""} onClick={() => changeMode("login")}>Entrar</button><button className={mode === "register" ? "active" : ""} onClick={() => changeMode("register")}>Criar conta</button></div>
     <form onSubmit={submit} noValidate>
@@ -68,10 +70,10 @@ function LoginPageContent() {
       {mode === "register" && <label className={fieldErrors.confirmPassword ? "field-invalid" : ""}>Confirmar senha<span className="password-field"><input name="confirmPassword" type={showConfirmation ? "text" : "password"} required minLength={8} autoComplete="new-password" aria-invalid={!!fieldErrors.confirmPassword} onChange={() => setFieldErrors(current => ({ ...current, confirmPassword: "" }))} /><button type="button" onClick={() => setShowConfirmation(!showConfirmation)} aria-label={showConfirmation ? "Ocultar confirmação de senha" : "Mostrar confirmação de senha"}>{showConfirmation ? <EyeOff /> : <Eye />}</button></span>{fieldErrors.confirmPassword && <small className="field-error">{fieldErrors.confirmPassword}</small>}</label>}
       {mode === "login" && <a className="forgot-link" href="/esqueci-senha">Esqueci minha senha</a>}<TurnstileWidget onToken={onTurnstile} resetSignal={turnstileReset}/>{fieldErrors.turnstile&&<small className="field-error">{fieldErrors.turnstile}</small>}{error && <p className="auth-error">{error}</p>}<button className="auth-submit" disabled={loading}>{loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar minha conta"}</button>
     </form><div className="auth-secure"><ShieldCheck /><span><b>Sessão protegida</b><small>Senha criptografada e cookie seguro.</small></span></div>
-  </section></main>;
+  </AuthLayout>;
 }
 
 // useSearchParams() must render inside a Suspense boundary (required by vinext/Next).
 export default function LoginPage() {
-  return <Suspense fallback={null}><LoginPageContent /></Suspense>;
+  return <SiteShell><Suspense fallback={null}><LoginPageContent /></Suspense></SiteShell>;
 }

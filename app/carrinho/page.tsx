@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import StoreHeader from "../store-header";
+import StoreFooter from "../store-footer";
 
 type Product = {
   code: string;
@@ -226,6 +227,7 @@ export default function CartPage() {
           </div>
         )}
       </section>
+      <StoreFooter />
     </main>
   );
 }

@@ -13,10 +13,13 @@ import {
   ShoppingCart,
   Truck,
   XCircle,
+  PackageSearch,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import StoreHeader from "../../store-header";
+import StoreFooter from "../../store-footer";
+import { StatePanel } from "../../ui";
 
 type Product = {
   code: string;
@@ -256,10 +259,9 @@ export default function ProductPage() {
     return (
       <main className="product-page">
         <StoreHeader cartCount={cartCount} />
-        <div className="product-not-found">
-          <h1>Produto não encontrado.</h1>
-          <a href="/catalogo">Voltar ao catálogo</a>
-        </div>
+        <StatePanel icon={<PackageSearch />} eyebrow="CATÁLOGO" title="Produto não encontrado." text="Este código não está disponível ou foi removido do catálogo. Busque pela peça ou pelo seu veículo."
+          actions={[{ href: "/catalogo", label: "Explorar catálogo", variant: "dark" }, { href: "/#compatibilidade", label: "Buscar pela placa", variant: "ghost" }]} />
+        <StoreFooter />
       </main>
     );
   const available =
@@ -477,6 +479,7 @@ export default function ProductPage() {
           </div>
         </aside>
       </section>
+      <StoreFooter />
     </main>
   );
 }

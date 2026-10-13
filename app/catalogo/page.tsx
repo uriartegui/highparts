@@ -14,6 +14,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import StoreHeader from "../store-header";
+import StoreFooter from "../store-footer";
 
 type Product = {
   code: string;
@@ -468,6 +469,7 @@ function CatalogPageContent() {
           </button>
         </aside>
       )}
+      <StoreFooter />
     </main>
   );
 }
