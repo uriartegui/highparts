@@ -32,6 +32,7 @@ type Product = {
   priceCents: number | null;
   stockQuantity: number | null;
   imageUrl: string | null;
+  images?: Array<{ url: string; altText: string }>;
 };
 const money = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -138,6 +139,7 @@ function checkCompatibility(vehicle: Vehicle, groups: ApplicationGroup[]) {
 export default function ProductPage() {
   const { code } = useParams<{ code: string }>();
   const [product, setProduct] = useState<Product | null>(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [cartCount, setCartCount] = useState(0);
   const [added, setAdded] = useState(false);
@@ -269,6 +271,12 @@ export default function ProductPage() {
     product.stockQuantity != null &&
     product.stockQuantity > 0;
   const applications = parseApplications(product.application);
+  const galleryImages = product.images?.length
+    ? product.images
+    : product.imageUrl
+      ? [{ url: product.imageUrl, altText: `${product.product} ${product.code}` }]
+      : [];
+  const displayedImage = selectedImage || galleryImages[0]?.url || null;
   const technical = [
     { icon: <PackageCheck />, label: "Tipo da peça", value: product.type },
     { icon: <CircleGauge />, label: "Posição / eixo", value: product.axle },
@@ -295,12 +303,12 @@ export default function ProductPage() {
       <section className="product-detail">
         <div className="product-gallery">
           <div
-            className={`product-render ${product.imageUrl ? "has-product-image" : ""}`}
+            className={`product-render ${displayedImage ? "has-product-image" : ""}`}
           >
             <span>HIGHPARTS · {product.product}</span>
-            {product.imageUrl ? (
+            {displayedImage ? (
               <img
-                src={product.imageUrl}
+                src={displayedImage}
                 alt={`${product.product} ${product.code}`}
               />
             ) : (
@@ -311,8 +319,23 @@ export default function ProductPage() {
             )}
             <b>{product.code}</b>
           </div>
+          {galleryImages.length > 1 && (
+            <div className="product-thumbnails" aria-label="Galeria de imagens do produto">
+              {galleryImages.map((image, index) => (
+                <button
+                  type="button"
+                  key={image.url}
+                  className={displayedImage === image.url ? "active" : ""}
+                  onClick={() => setSelectedImage(image.url)}
+                  aria-label={`Ver imagem ${index + 1}: ${image.altText}`}
+                >
+                  <img src={image.url} alt="" />
+                </button>
+              ))}
+            </div>
+          )}
           <small>
-            {product.imageUrl
+            {displayedImage
               ? "Imagem cadastrada no catálogo HighParts."
               : "Imagem ilustrativa. Confira as especificações e a aplicação."}
           </small>
