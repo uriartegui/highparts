@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { getMercadoPagoPayment, mercadoPagoMode, verifyMercadoPagoWebhook } from "../../../../mercado-pago";
+import { blingEnabled } from "../../../../bling";
 
 type Notification = { type?: string; data?: { id?: string | number } };
 const paymentStatus: Record<string, string> = {
@@ -105,5 +106,10 @@ export async function POST(request: Request) {
     ).bind(nextStatus, dataId, mode, nextStatus, orderId, ...fromStatuses),
     event,
   ]);
+  if (nextStatus === "paid") {
+    await env.DB.prepare(
+      "UPDATE orders SET bling_sync_status=? WHERE id=? AND bling_order_id IS NULL",
+    ).bind(blingEnabled() ? "pending" : "not_configured", orderId).run();
+  }
   return Response.json({ ok: true });
 }

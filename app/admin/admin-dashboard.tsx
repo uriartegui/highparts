@@ -12,6 +12,7 @@ import {
   LoaderCircle,
   MapPin,
   PackageSearch,
+  PlugZap,
   RefreshCw,
   Save,
   Search,
@@ -62,7 +63,14 @@ type Order = {
     packed: number;
   }>;
 };
-type Tab = "inventory" | "orders" | "finance";
+type Tab = "inventory" | "orders" | "finance" | "integrations";
+type BlingStatus = {
+  configured: boolean;
+  connected: boolean;
+  enabled: boolean;
+  credentialUpdatedAt: string | null;
+  products: { total: number; linked: number; official: number };
+};
 type InventoryFilter = "all" | "missing-price" | "missing-stock" | "ready";
 const statusLabels: Record<string, string> = {
   awaiting_payment: "Aguardando pagamento",
@@ -95,6 +103,7 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [message, setMessage] = useState("");
+  const [bling, setBling] = useState<BlingStatus | null>(null);
   const orderMetrics = {
     awaiting: orders.filter((order) => order.status === "awaiting_payment")
       .length,
@@ -128,6 +137,12 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
     }
     setLoading(false);
   };
+  const loadBling = async () => {
+    setLoading(true);
+    const response = await fetch("/api/admin/bling/status");
+    if (response.ok) setBling(await response.json() as BlingStatus);
+    setLoading(false);
+  };
   useEffect(() => {
     loadProducts();
   }, []);
@@ -135,7 +150,22 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
     setTab(next);
     setMessage("");
     if (next === "orders" || next === "finance") loadOrders();
+    else if (next === "integrations") loadBling();
     else loadProducts(query);
+  };
+  const syncBling = async () => {
+    if (!window.confirm(
+      "Importar agora? O Bling passará a ser a fonte oficial de preço e estoque dos produtos com o mesmo SKU.",
+    )) return;
+    setSyncing(true);
+    setMessage("");
+    const response = await fetch("/api/admin/bling/sync", { method: "POST" });
+    const result = await response.json().catch(() => ({})) as { seen?: number; linked?: number; error?: string };
+    setMessage(response.ok
+      ? `${result.linked || 0} de ${result.seen || 0} produtos do Bling vinculados por SKU.`
+      : result.error || "Falha ao sincronizar o Bling.");
+    setSyncing(false);
+    if (response.ok) await loadBling();
   };
   const sync = async () => {
     setSyncing(true);
@@ -221,6 +251,12 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
           >
             <BarChart3 /> Financeiro
           </button>
+          <button
+            className={tab === "integrations" ? "active" : ""}
+            onClick={() => changeTab("integrations")}
+          >
+            <PlugZap /> Integrações
+          </button>
         </nav>
         <div className="admin-user">
           <ShieldCheck />
@@ -241,27 +277,39 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
                 ? "CATÁLOGO HIGHPARTS"
                 : tab === "orders"
                   ? "VENDAS HIGHPARTS"
-                  : "DESEMPENHO HIGHPARTS"}
+                  : tab === "finance"
+                    ? "DESEMPENHO HIGHPARTS"
+                    : "OPERAÇÃO HIGHPARTS"}
             </small>
             <h1>
               {tab === "inventory"
                 ? "Produtos e estoque"
                 : tab === "orders"
                   ? "Pedidos recebidos"
-                  : "Visão financeira"}
+                  : tab === "finance"
+                    ? "Visão financeira"
+                    : "Integrações"}
             </h1>
             <p>
               {tab === "inventory"
                 ? "Informe preço, saldo e imagem para liberar cada produto na loja."
                 : tab === "orders"
                   ? "Consulte clientes, valores e atualize o andamento de cada venda."
-                  : "Acompanhe vendas confirmadas, ticket médio e produtos com maior saída."}
+                  : tab === "finance"
+                    ? "Acompanhe vendas confirmadas, ticket médio e produtos com maior saída."
+                    : "Conecte o ERP e acompanhe a fonte oficial de estoque."}
             </p>
           </div>
           {tab === "inventory" && (
             <button onClick={sync} disabled={syncing}>
               {syncing ? <LoaderCircle className="spin" /> : <RefreshCw />}
               {syncing ? "Sincronizando..." : "Sincronizar planilha"}
+            </button>
+          )}
+          {tab === "integrations" && bling?.connected && (
+            <button onClick={syncBling} disabled={syncing}>
+              {syncing ? <LoaderCircle className="spin" /> : <RefreshCw />}
+              {syncing ? "Sincronizando..." : "Sincronizar Bling"}
             </button>
           )}
         </header>
@@ -271,7 +319,7 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
             {message}
           </div>
         )}
-        {tab !== "finance" && (
+        {tab !== "finance" && tab !== "integrations" && (
           <div className="admin-summary">
             {tab === "inventory" ? (
               <>
@@ -339,11 +387,49 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
           />
         ) : tab === "orders" ? (
           <Orders orders={orders} loading={loading} updateOrder={updateOrder} />
-        ) : (
+        ) : tab === "finance" ? (
           <Finance orders={orders} loading={loading} />
+        ) : (
+          <BlingIntegration status={bling} loading={loading} />
         )}
       </section>
     </main>
+  );
+}
+
+function BlingIntegration({ status, loading }: { status: BlingStatus | null; loading: boolean }) {
+  if (loading) return <div className="admin-loading"><LoaderCircle className="spin" /> Carregando integração...</div>;
+  if (!status) return <div className="admin-empty"><PlugZap /><h2>Integração indisponível</h2><p>Não foi possível consultar o Bling.</p></div>;
+  return (
+    <section className="integration-panel">
+      <div className="integration-card">
+        <span className={`integration-mark ${status.connected ? "ok" : ""}`}><PlugZap /></span>
+        <div>
+          <small>ERP E ESTOQUE OFICIAL</small>
+          <h2>Bling</h2>
+          <p>
+            {!status.configured
+              ? "Cadastre as credenciais do aplicativo no Worker antes de conectar."
+              : !status.connected
+                ? "As credenciais estão prontas. Autorize a conta Bling para iniciar a conciliação."
+                : status.enabled
+                  ? "Integração ativa: pedidos pagos e estoque serão sincronizados automaticamente."
+                  : "Conta conectada em modo seguro. Confira os SKUs antes de ativar os pedidos automáticos."}
+          </p>
+        </div>
+        {status.configured && !status.connected && <a href="/api/admin/bling/connect">Conectar Bling</a>}
+        {status.connected && <b className={status.enabled ? "active" : "standby"}>{status.enabled ? "Ativa" : "Em preparação"}</b>}
+      </div>
+      <div className="integration-metrics">
+        <article><small>Produtos no site</small><b>{status.products.total}</b></article>
+        <article><small>SKUs vinculados</small><b>{status.products.linked}</b></article>
+        <article><small>Estoque pelo Bling</small><b>{status.products.official}</b></article>
+      </div>
+      <div className="integration-note">
+        <ShieldCheck />
+        <span><b>Proteção contra baixa duplicada</b><small>O saldo recebido do Bling substitui o saldo oficial e desconta apenas reservas locais ainda não enviadas ao ERP.</small></span>
+      </div>
+    </section>
   );
 }
 
