@@ -27,6 +27,8 @@ config.vars = {
   ...config.vars,
   TURNSTILE_SITE_KEY: process.env.TURNSTILE_SITE_KEY || TURNSTILE_SITE_KEY,
   ...(process.env.AUTH_FROM_EMAIL ? { AUTH_FROM_EMAIL: process.env.AUTH_FROM_EMAIL } : {}),
+  // Only the exact value "production" enables live Mercado Pago checkout.
+  ...(process.env.MERCADO_PAGO_ENV ? { MERCADO_PAGO_ENV: process.env.MERCADO_PAGO_ENV } : {}),
 };
 if (!config.vars.AUTH_FROM_EMAIL) {
   console.warn("AUTH_FROM_EMAIL is not set: verification and password reset emails will not be sent.");

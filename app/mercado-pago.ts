@@ -99,6 +99,10 @@ export async function getMercadoPagoPayment(id: string) {
   const response = await fetch("https://api.mercadopago.com/v1/payments/" + encodeURIComponent(id), {
     headers: { authorization: "Bearer " + token },
   });
+  // A payment id unknown to this account (e.g. the panel's simulated "123456",
+  // or a payment from the other mode) is not retryable: report it as missing.
+  // Any other failure throws so the webhook answers 5xx and Mercado Pago retries.
+  if (response.status === 404) return null;
   if (!response.ok) throw new Error("MERCADO_PAGO_PAYMENT_LOOKUP_FAILED");
   return (await response.json()) as PaymentResponse;
 }
