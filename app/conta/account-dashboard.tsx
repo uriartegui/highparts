@@ -626,7 +626,12 @@ export default function AccountDashboard({ user }: { user: User }) {
                       ].map((step, index) => (
                         <span
                           key={step}
-                          className={index <= progress ? "active" : ""}
+                          className={[
+                            index <= progress ? "active" : "",
+                            index < progress ? "connector-active" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
                         >
                           <i>{index + 1}</i>
                           <b>{step}</b>
