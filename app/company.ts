@@ -14,14 +14,14 @@ export const COMPANY = {
     state: "SC",
     postalCode: "88160-710",
   },
-  supportEmail: "alisson@highparts.com.br",
+  supportEmail: "contato@highparts.com.br",
   phone: "(48) 9160-0517",
   whatsapp: "", // digits only with country code, e.g. "5548999999999"
   hours: "", // e.g. "Segunda a sexta, das 9h às 18h"
   privacyContact: {
     // Encarregado pelo tratamento de dados pessoais (LGPD, art. 41).
     name: "",
-    email: "alisson@highparts.com.br",
+    email: "contato@highparts.com.br",
   },
   legalVersion: "13 de outubro de 2026",
 };
