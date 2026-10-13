@@ -10,7 +10,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Props = {
   userName?: string | null;
@@ -109,6 +109,14 @@ export default function StoreHeader({
   darkTopbar = true,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  // Frosted-glass header once the page scrolls (Apple-style).
+  useEffect(() => {
+    const update = () => setScrolled(window.scrollY > 8);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => window.removeEventListener("scroll", update);
+  }, []);
   const openCart = () =>
     userName
       ? (onCart ?? (() => window.location.assign("/carrinho")))()
@@ -126,7 +134,7 @@ export default function StoreHeader({
           </span>
         </div>
       )}
-      <header className="header store-header">
+      <header className={`header store-header${scrolled ? " is-scrolled" : ""}`}>
         <button
           className="mobile-menu"
           onClick={() => setOpen(!open)}

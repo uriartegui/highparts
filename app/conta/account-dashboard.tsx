@@ -700,7 +700,7 @@ export default function AccountDashboard({ user }: { user: User }) {
                 Quando você finalizar uma compra, o acompanhamento aparecerá
                 aqui.
               </p>
-              <a href="/catalogo">Explorar catálogo</a>
+              <a className="hp-btn hp-btn-dark" href="/catalogo">Explorar catálogo</a>
             </div>
           )}
         </article>
