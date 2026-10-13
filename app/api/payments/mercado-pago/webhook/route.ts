@@ -35,6 +35,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Assinatura inválida." }, { status: 401 });
 
   const payment = await getMercadoPagoPayment(dataId);
+  if (!payment) {
+    console.warn("mercado_pago_payment_not_found", dataId);
+    return Response.json({ ok: true, ignored: "payment_not_found" });
+  }
   const orderId = String(payment.external_reference || "");
   if (!orderId || !payment.status) return Response.json({ ok: true });
   const order = await env.DB.prepare(
