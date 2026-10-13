@@ -72,6 +72,28 @@ const initialProducts = (catalogSource as StaticProduct[])
 const money = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+function featuredCompatibility(fit: string) {
+  const labels: Record<string, string> = {
+    VW: "Volkswagen",
+    GM: "Chevrolet",
+  };
+  const brands = [
+    ...new Set(
+      [...fit.matchAll(/\[([^\]]+)\]/g)].map((match) => {
+        const brand = match[1].trim().toUpperCase();
+        return labels[brand] || match[1].trim();
+      }),
+    ),
+  ];
+  if (!brands.length) return "Consulte os modelos e anos compatíveis.";
+  const visible = brands.slice(0, 3);
+  const list =
+    visible.length > 1
+      ? `${visible.slice(0, -1).join(", ")} e ${visible.at(-1)}`
+      : visible[0];
+  return `Aplicações para ${list}${brands.length > 3 ? " e outras marcas" : ""}. Consulte modelos e anos.`;
+}
+
 function PartVisual({ product }: { product: Product }) {
   return (
     <div
@@ -443,14 +465,19 @@ export default function Home() {
                 <span className="badge">Disponível</span>
                 <PartVisual product={p} />
                 <div className="product-body">
-                  <small>
-                    {p.category} • {p.id}
-                  </small>
+                  <small>CÓDIGO HIGHPARTS · {p.id}</small>
                   <h3>{p.name}</h3>
-                  <p>{p.fit}</p>
+                  <p className="featured-fit">{featuredCompatibility(p.fit)}</p>
+                  <span className="featured-more">
+                    Ver aplicações completas <ChevronRight />
+                  </span>
                   <div className="price">
                     <b>{money(p.price!)}</b>
-                    <span>{p.stock} unidades disponíveis</span>
+                    <span>
+                      {p.stock === 1
+                        ? "Última unidade em estoque"
+                        : `${p.stock} unidades em estoque`}
+                    </span>
                   </div>
                   <button
                     className="buy"
