@@ -266,9 +266,9 @@ export default function Home() {
             <Zap /> ENCONTRE A PEÇA CERTA, SEM ADIVINHAÇÃO
           </div>
           <h1>
-            PRECISÃO PARA
+            CONFIANÇA COMEÇA
             <br />
-            SEGUIR <em>ALÉM.</em>
+            NA <em>ESCOLHA.</em>
           </h1>
           <p>
             Catálogo técnico, busca orientada pelo seu veículo e uma experiência
