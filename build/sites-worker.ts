@@ -43,6 +43,13 @@ function isCrossSiteWrite(request: Request) {
 
 export default {
   fetch(request: Request, env: Cloudflare.Env, ctx: ExecutionContext<{ CONNECTORS?: ConnectorBinding }>) {
+    // Canonical host: www.highparts.com.br permanently redirects to the apex.
+    const incoming = new URL(request.url);
+    if (incoming.hostname === "www.highparts.com.br") {
+      incoming.hostname = "highparts.com.br";
+      incoming.protocol = "https:";
+      return withSecurityHeaders(Response.redirect(incoming.toString(), 301));
+    }
     if (isCrossSiteWrite(request)) {
       return withSecurityHeaders(Response.json({ error: "Origem da solicitação não permitida." }, { status: 403 }));
     }

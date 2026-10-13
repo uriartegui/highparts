@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { COMPANY } from "./company";
 
 type Props = {
   userName?: string | null;
@@ -83,13 +84,13 @@ const groups = [
       <>
         <div>
           <small>AJUDA</small>
-          <a href="mailto:alisson@highparts.com.br">Fale com a HighParts</a>
+          <a href={`mailto:${COMPANY.supportEmail}`}>Fale com a HighParts</a>
           <a href="/trocas-e-devolucoes">Trocas e devoluções</a>
           <a href="/conta">Acompanhar pedido</a>
         </div>
         <a
           className="nav-feature light wide"
-          href="mailto:alisson@highparts.com.br"
+          href={`mailto:${COMPANY.supportEmail}`}
         >
           <Headphones />
           <span>

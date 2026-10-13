@@ -248,3 +248,30 @@
 /* KPI cards overlap the hero bottom edge, Apple-style. */
 .hp-hero:has(+ .hp-security) { padding-bottom: 140px; }
 @media (max-width: 900px) { .hp-hero:has(+ .hp-security) { padding-bottom: 110px; } }
+
+/* ---------- Footer seller identification (Decreto 7.962/2013) ---------- */
+.store-footer .footer-legal { display: block !important; border-top: 1px solid #232529; padding: 18px max(5vw, 78px) 0; }
+.store-footer .footer-legal small { display: block; font-size: 11px; line-height: 1.6; color: #8a8e95; }
+.store-footer .footer-legal b { color: #c9cbd0; font-weight: 600; }
+.store-footer .footer-legal + .footer-bottom { border-top: 0; }
+.store-footer .footer-contact > a + a { margin-top: 10px; }
+@media (max-width: 900px) { .store-footer .footer-legal { padding: 18px 35px 0; } }
+@media (max-width: 640px) { .store-footer .footer-legal { padding: 18px 22px 0; } }
+
+/* ---------- Legal text details ---------- */
+.hp-legal-article a { color: #0066cc; font-weight: 500; }
+.hp-legal-article a:hover { text-decoration: underline; }
+.hp-legal-article .hp-btn { color: #fff; }
+.hp-legal-article .hp-btn:hover { text-decoration: none; }
+.hp-legal-article ul { margin: 0 0 16px; padding-left: 22px; list-style: disc; display: grid; gap: 8px; }
+.hp-legal-article li { padding-left: 4px; }
+.hp-legal-article li::marker { color: var(--hp-red); }
+.hp-legal-article code { font-size: 0.88em; padding: 2px 7px; border-radius: 6px; background: var(--hp-bg); color: var(--hp-ink); }
+.hp-legal-article b { color: var(--hp-ink); font-weight: 600; }
+.hp-company-id { list-style: none !important; padding: 6px 0 !important; margin: 8px 0 18px !important; border-radius: var(--hp-radius); background: var(--hp-bg); display: grid; gap: 0 !important; }
+.hp-company-id li { padding-left: 20px; display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 14px; padding: 10px 20px; font-size: 15px !important; line-height: 1.5 !important; }
+.hp-company-id li + li { border-top: 1px solid var(--hp-line); }
+.hp-company-id li::marker { content: none; }
+.hp-company-id span { color: var(--hp-muted); }
+.hp-company-id b { font-weight: 600; color: var(--hp-ink); overflow-wrap: anywhere; }
+@media (max-width: 560px) { .hp-company-id li { grid-template-columns: 1fr; gap: 2px; padding: 10px 16px; } }
