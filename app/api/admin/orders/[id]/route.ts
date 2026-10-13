@@ -1,6 +1,7 @@
 import { env } from "cloudflare:workers";
 import { getAdmin } from "../../../../admin/admin-auth";
 import { escapeHtml, sendAuthEmail } from "../../../../email";
+import { cancelBlingOrder } from "../../../../bling";
 
 const statuses = new Set([
   "awaiting_payment",
@@ -42,10 +43,10 @@ export async function PATCH(
   if (input.status && !statuses.has(input.status))
     return Response.json({ error: "Status inválido" }, { status: 400 });
   const order = await env.DB.prepare(
-    "SELECT status,customer_name AS customerName,customer_email AS customerEmail FROM orders WHERE id=?",
+    "SELECT status,customer_name AS customerName,customer_email AS customerEmail,bling_order_id AS blingOrderId FROM orders WHERE id=?",
   )
     .bind(id)
-    .first<{ status: string; customerName: string; customerEmail: string }>();
+    .first<{ status: string; customerName: string; customerEmail: string; blingOrderId: string | null }>();
   if (!order)
     return Response.json({ error: "Pedido não encontrado" }, { status: 404 });
   if (
@@ -77,6 +78,18 @@ export async function PATCH(
       { status: 400 },
     );
 
+  if (nextStatus === "cancelled" && order.status !== "cancelled" && order.blingOrderId) {
+    try {
+      await cancelBlingOrder(order.blingOrderId);
+    } catch (error) {
+      console.error("bling_order_cancel_failed", id, error);
+      return Response.json(
+        { error: "O pedido não foi cancelado porque o Bling não confirmou a liberação do estoque. Tente novamente." },
+        { status: 502 },
+      );
+    }
+  }
+
   const statements = [
     env.DB.prepare(
       `UPDATE orders SET status=?,shipping_carrier=?,shipping_service=?,tracking_code=?,
@@ -99,6 +112,9 @@ export async function PATCH(
       );
   }
   if (nextStatus === "cancelled" && order.status !== "cancelled") {
+    statements.push(
+      env.DB.prepare("UPDATE orders SET bling_sync_status='cancelled' WHERE id=?").bind(id),
+    );
     const items = await env.DB.prepare(
       "SELECT item_key AS itemKey,quantity FROM order_snapshot_items WHERE order_id=?",
     )

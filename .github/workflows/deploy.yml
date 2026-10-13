@@ -43,6 +43,9 @@ jobs:
           CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
           AUTH_FROM_EMAIL: ${{ vars.AUTH_FROM_EMAIL }}
           MERCADO_PAGO_ENV: ${{ vars.MERCADO_PAGO_ENV }}
+          BLING_INTEGRATION_ENABLED: ${{ vars.BLING_INTEGRATION_ENABLED }}
+          BLING_PAYMENT_METHOD_ID: ${{ vars.BLING_PAYMENT_METHOD_ID }}
+          BLING_PAID_ORDER_STATUS_ID: ${{ vars.BLING_PAID_ORDER_STATUS_ID }}
 
       - name: Apply database migrations
         uses: cloudflare/wrangler-action@v4

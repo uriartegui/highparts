@@ -29,9 +29,15 @@ config.vars = {
   ...(process.env.AUTH_FROM_EMAIL ? { AUTH_FROM_EMAIL: process.env.AUTH_FROM_EMAIL } : {}),
   // Only the exact value "production" enables live Mercado Pago checkout.
   ...(process.env.MERCADO_PAGO_ENV ? { MERCADO_PAGO_ENV: process.env.MERCADO_PAGO_ENV } : {}),
+  ...(process.env.BLING_INTEGRATION_ENABLED ? { BLING_INTEGRATION_ENABLED: process.env.BLING_INTEGRATION_ENABLED } : {}),
+  ...(process.env.BLING_PAYMENT_METHOD_ID ? { BLING_PAYMENT_METHOD_ID: process.env.BLING_PAYMENT_METHOD_ID } : {}),
+  ...(process.env.BLING_PAID_ORDER_STATUS_ID ? { BLING_PAID_ORDER_STATUS_ID: process.env.BLING_PAID_ORDER_STATUS_ID } : {}),
 };
 if (!config.vars.AUTH_FROM_EMAIL) {
   console.warn("AUTH_FROM_EMAIL is not set: verification and password reset emails will not be sent.");
+}
+if (process.env.BLING_INTEGRATION_ENABLED === "true") {
+  config.triggers = { ...config.triggers, crons: ["*/5 * * * *"] };
 }
 
 await writeFile(outputPath, `${JSON.stringify(config, null, 2)}\n`);

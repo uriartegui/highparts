@@ -28,9 +28,12 @@ function withSecurityHeaders(response: Response) {
 // Browsers always send Origin (and Sec-Fetch-Site) on cross-origin writes, so
 // a mismatch means another site is driving the user's session. Requests with
 // no Origin (curl, server-to-server) can't ride on browser cookies and pass;
-// the only exemption is the exact Mercado Pago webhook path, which is called
-// server-to-server and authenticates with its HMAC signature.
-const CSRF_EXEMPT_PATHS = new Set(["/api/payments/mercado-pago/webhook"]);
+// exemptions are exact server-to-server webhook paths. Each exempt endpoint
+// authenticates the raw request body with its provider's HMAC signature.
+const CSRF_EXEMPT_PATHS = new Set([
+  "/api/payments/mercado-pago/webhook",
+  "/api/integrations/bling/webhook",
+]);
 
 function isCrossSiteWrite(request: Request) {
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return false;
@@ -66,5 +69,16 @@ export default {
       };
     }
     return Promise.resolve(runWithConnectorBinding(binding, () => handler.fetch(request, env, ctx))).then(withSecurityHeaders);
+  },
+  scheduled(_controller: ScheduledController, _env: Cloudflare.Env, ctx: ExecutionContext) {
+    ctx.waitUntil(
+      import("../app/bling")
+        .then(({ blingEnabled, syncPendingBlingOrders }) => blingEnabled() ? syncPendingBlingOrders(50) : [])
+        .then((results) => {
+          const failed = results.filter((item) => !item.ok);
+          if (failed.length) console.error("bling_scheduled_sync_failures", failed);
+        })
+        .catch((error) => console.error("bling_scheduled_sync_failed", error)),
+    );
   },
 };
