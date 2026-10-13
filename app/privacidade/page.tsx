@@ -16,13 +16,13 @@ export default function Page() {
 
       <h2>2. Quais dados tratamos</h2>
       <ul>
-        <li><b>Cadastro:</b> nome, e-mail e telefone. A senha é guardada apenas em formato criptografado, que não permite recuperá-la.</li>
-        <li><b>Garagem:</b> placa, marca, modelo, ano e versão dos veículos que você salvar.</li>
+        <li><b>Cadastro:</b> nome, e-mail e telefone. A senha é protegida por derivação criptográfica (hash) e não é armazenada em texto legível.</li>
+        <li><b>Dados do veículo:</b> placa, marca, modelo, ano, versão e respostas de compatibilidade quando você utilizar a consulta de placa, o assistente ou informar um veículo em um pedido.</li>
         <li><b>Endereços e pedidos:</b> endereços de entrega, itens comprados, valores, status, transportadora e código de rastreio.</li>
         <li><b>Carrinho:</b> os itens escolhidos, salvos na sua conta e no seu navegador.</li>
         <li><b>Pagamento:</b> recebemos do Mercado Pago apenas a identificação, o status, o valor e a moeda do pagamento. Dados de cartão não passam pela HighParts.</li>
-        <li><b>Consulta pela placa:</b> a placa informada é enviada ao nosso provedor de dados veiculares para identificar o veículo. O resultado (marca, modelo, ano e motorização, sem dados do proprietário) é guardado por até 30 dias, associado a uma versão codificada da placa, para agilizar novas consultas.</li>
-        <li><b>Segurança:</b> registros de login, de tentativas que falharam e de bloqueios, guardados com versões codificadas do e-mail e do endereço de rede, além da verificação anti-robô (Cloudflare Turnstile).</li>
+        <li><b>Consulta pela placa:</b> quando a consulta automática estiver habilitada, a placa informada é enviada ao provedor de dados veiculares para identificar o veículo. O retorno usado pela HighParts não deve conter dados do proprietário. Para reduzir consultas repetidas, o resultado fica em cache por até 30 dias, associado a um hash da placa.</li>
+        <li><b>Segurança:</b> eventos de criação de conta, autenticação, falhas e bloqueios, com identificadores protegidos por hash quando aplicável, além de dados técnicos processados pela verificação anti-robô (Cloudflare Turnstile).</li>
       </ul>
 
       <h2>3. Para que usamos e com qual base legal</h2>
@@ -44,7 +44,7 @@ export default function Page() {
         <li><b>Contabilidade e emissão fiscal:</b> cumprimento de obrigações fiscais.</li>
         <li><b>Autoridades públicas:</b> quando exigido por lei ou ordem judicial.</li>
       </ul>
-      <p>Alguns desses prestadores podem processar dados fora do Brasil. Nesses casos, a transferência segue o art. 33 da LGPD, com prestadores que adotam padrões adequados de proteção.</p>
+      <p>Alguns prestadores podem processar dados fora do Brasil. A HighParts deve limitar o compartilhamento ao necessário e adotar os mecanismos aplicáveis para transferência internacional previstos na LGPD.</p>
 
       <h2>5. Cookies e armazenamento no navegador</h2>
       <ul>
@@ -56,9 +56,9 @@ export default function Page() {
 
       <h2>6. Por quanto tempo guardamos</h2>
       <ul>
-        <li><b>Conta:</b> enquanto ela estiver ativa, ou até você pedir a exclusão.</li>
-        <li><b>Pedidos e dados fiscais:</b> pelo prazo exigido pela legislação fiscal e de defesa do consumidor (em regra, 5 anos).</li>
-        <li><b>Registros de acesso:</b> por no mínimo 6 meses, conforme o Marco Civil da Internet.</li>
+        <li><b>Conta:</b> enquanto ela estiver ativa e, depois disso, pelo período necessário ao cumprimento de obrigações legais ou ao exercício regular de direitos.</li>
+        <li><b>Pedidos e documentos fiscais:</b> durante os prazos legais aplicáveis à relação de consumo e às obrigações fiscais.</li>
+        <li><b>Eventos de segurança:</b> pelo tempo necessário para prevenção de fraude, proteção das contas e cumprimento das obrigações legais aplicáveis.</li>
         <li><b>Consultas de placa:</b> até 30 dias.</li>
       </ul>
 

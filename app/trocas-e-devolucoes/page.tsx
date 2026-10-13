@@ -17,6 +17,7 @@ export default function Page() {
         <li>fotos da peça e da embalagem, quando houver defeito, avaria ou divergência.</li>
       </ul>
       <p>Respondemos com as instruções de envio. Não envie a peça sem antes falar conosco, para que a devolução seja identificada corretamente.</p>
+      <p>Confirmamos o recebimento da solicitação pelo mesmo meio utilizado pelo cliente e prestamos uma resposta em até 5 dias, sem prejuízo de prazos menores previstos em lei.</p>
 
       <h2>2. Direito de arrependimento (7 dias)</h2>
       <p>Você pode desistir da compra em até <b>7 dias corridos a partir do recebimento</b>, sem precisar justificar (art. 49 do Código de Defesa do Consumidor).</p>

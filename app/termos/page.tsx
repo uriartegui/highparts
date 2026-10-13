@@ -18,7 +18,7 @@ export default function Page() {
       </ul>
 
       <h2>3. Produtos, compatibilidade e imagens</h2>
-      <p>As aplicações por veículo vêm do catálogo técnico dos fabricantes. A consulta pela placa é uma ferramenta de apoio: antes de comprar, confira o código da peça, o ano, a versão, a motorização e equipamentos como ABS. Em caso de dúvida, fale com o nosso atendimento antes de finalizar o pedido.</p>
+      <p>As aplicações por veículo são importadas do catálogo comercial utilizado pela HighParts. A consulta pela placa e o assistente de compatibilidade são ferramentas de apoio: antes de comprar, confira o código da peça, o ano, a versão, a motorização e equipamentos como ABS. Em caso de dúvida, fale com o nosso atendimento antes de finalizar o pedido.</p>
       <p>As imagens são ilustrativas e podem não representar exatamente cor, acabamento ou embalagem do produto. As especificações técnicas descritas prevalecem sobre a imagem.</p>
 
       <h2>4. Preços, estoque e pedidos</h2>
@@ -32,7 +32,8 @@ export default function Page() {
       <p>Os pagamentos são processados pelo Mercado Pago, em ambiente próprio e seguro. A HighParts não recebe nem armazena os dados do seu cartão. A confirmação do pagamento é feita diretamente pelo Mercado Pago. Pedidos que não forem pagos podem ser cancelados e ter o estoque liberado.</p>
 
       <h2>6. Entrega</h2>
-      <p>O prazo e o valor do frete são informados antes do pagamento. O prazo começa a contar a partir da confirmação do pagamento. Confira o endereço de entrega: entregas que retornarem por endereço incorreto ou ausência do destinatário podem ter novo frete cobrado. O código de rastreio é enviado por e-mail e fica disponível na sua conta.</p>
+      <p>A HighParts informará a modalidade, o prazo estimado e eventual custo de entrega antes de concluir a contratação do frete. Enquanto a cotação automática não estiver disponível no checkout, nenhuma despesa adicional de entrega será cobrada sem a concordância expressa do cliente. Se não for possível combinar uma forma de entrega, o cliente poderá cancelar o pedido com restituição integral.</p>
+      <p>O prazo acordado começa a contar a partir da confirmação do pagamento e da modalidade de entrega. Confira o endereço informado. Quando houver rastreamento, o código ficará disponível na conta e poderá ser comunicado por e-mail.</p>
 
       <h2>7. Trocas, devoluções e garantia</h2>
       <p>Seus direitos de arrependimento, troca e garantia seguem o Código de Defesa do Consumidor e estão detalhados na página de <a href="/trocas-e-devolucoes">Trocas e devoluções</a>.</p>

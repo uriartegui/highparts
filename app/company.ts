@@ -1,7 +1,7 @@
 // Single source of truth for the company identification that Brazilian
 // e-commerce law (Decreto 7.962/2013, art. 2) requires on the site, and for the
 // contact details used by the footer and the legal pages.
-// Empty fields are simply not rendered, so fill them in before publishing.
+// Required identification fields must be filled before publishing these pages.
 export const COMPANY = {
   tradeName: "HighParts",
   legalName: "HIGHPARTS AUTOPECAS LTDA",
@@ -35,4 +35,18 @@ export function formatAddress() {
 
 export function whatsappLink(text = "Olá, HighParts! Preciso de ajuda com uma peça.") {
   return COMPANY.whatsapp ? `https://wa.me/${COMPANY.whatsapp}?text=${encodeURIComponent(text)}` : "";
+}
+
+export function companyIdentificationIsComplete() {
+  const a = COMPANY.address;
+  return Boolean(
+    COMPANY.legalName &&
+    COMPANY.cnpj &&
+    a.street &&
+    a.district &&
+    a.city &&
+    a.state &&
+    a.postalCode &&
+    COMPANY.supportEmail,
+  );
 }
