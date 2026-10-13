@@ -424,7 +424,22 @@ export default function Home() {
           </div>
           <div className="product-grid">
             {featured.map((p) => (
-              <article className="product" key={p.id}>
+              <article
+                className="product featured-product"
+                key={p.id}
+                role="link"
+                tabIndex={0}
+                aria-label={`Ver detalhes de ${p.name} ${p.id}`}
+                onClick={() => {
+                  window.location.href = `/produto/${encodeURIComponent(p.id)}`;
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    window.location.href = `/produto/${encodeURIComponent(p.id)}`;
+                  }
+                }}
+              >
                 <span className="badge">Disponível</span>
                 <PartVisual product={p} />
                 <div className="product-body">
@@ -437,7 +452,13 @@ export default function Home() {
                     <b>{money(p.price!)}</b>
                     <span>{p.stock} unidades disponíveis</span>
                   </div>
-                  <button className="buy" onClick={() => addToCart(p.id)}>
+                  <button
+                    className="buy"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      addToCart(p.id);
+                    }}
+                  >
                     <ShoppingCart /> Adicionar ao carrinho
                   </button>
                 </div>
