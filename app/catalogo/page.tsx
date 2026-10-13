@@ -8,7 +8,6 @@ import {
   PackageSearch,
   Search,
   ShoppingCart,
-  SlidersHorizontal,
   X,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -183,12 +182,6 @@ function CatalogPageContent() {
             }}
             placeholder="Busque por peça, código ou veículo — ex.: Gol 1.6"
           />
-          <button
-            aria-label="Abrir filtros"
-            onClick={() => setFiltersOpen(true)}
-          >
-            <SlidersHorizontal />
-          </button>
         </label>
       </section>
       {recentProducts.length > 0 && (
