@@ -5,17 +5,17 @@
 export const COMPANY = {
   tradeName: "HighParts",
   legalName: "HIGHPARTS AUTOPECAS LTDA",
-  cnpj: "", // e.g. "00.000.000/0001-00"
+  cnpj: "69.510.025/0001-31",
   address: {
-    street: "", // e.g. "Rua Exemplo, 123"
-    complement: "",
-    district: "",
-    city: "",
-    state: "", // UF
-    postalCode: "", // e.g. "88000-000"
+    street: "Servidão Hermann Vieira, 100",
+    complement: "Galpão 01",
+    district: "Bom Viver",
+    city: "Biguaçu",
+    state: "SC",
+    postalCode: "88160-710",
   },
   supportEmail: "alisson@highparts.com.br",
-  phone: "", // e.g. "(48) 0000-0000"
+  phone: "(48) 9160-0517",
   whatsapp: "", // digits only with country code, e.g. "5548999999999"
   hours: "", // e.g. "Segunda a sexta, das 9h às 18h"
   privacyContact: {
