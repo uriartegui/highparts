@@ -190,13 +190,18 @@ export async function blingStatus() {
 type BlingProduct = {
   id: number;
   codigo?: string;
+  nome?: string;
   preco?: number;
   situacao?: string;
   estoque?: { saldoVirtualTotal?: number };
 };
 
 async function applyBlingProduct(product: BlingProduct) {
-  const code = String(product.codigo || "").trim();
+  const blingCode = String(product.codigo || "").trim();
+  const nameCode = String(product.nome || "").match(/^(HF\s+[A-Z0-9]+)/i)?.[1]
+    ?.replace(/\s+/g, " ")
+    .toUpperCase();
+  const code = /^HF\s+/i.test(blingCode) ? blingCode : (nameCode || blingCode);
   if (!code) return false;
   const priceCents = Number.isFinite(Number(product.preco)) ? Math.max(0, Math.round(Number(product.preco) * 100)) : null;
   const hasOfficialStock = Number.isFinite(Number(product.estoque?.saldoVirtualTotal));
