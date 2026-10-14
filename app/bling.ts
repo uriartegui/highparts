@@ -212,10 +212,11 @@ async function applyBlingProduct(product: BlingProduct) {
        AND o.status IN ('awaiting_payment','payment_failed','paid')
      ),0)) END,
      price_cents=COALESCE(?,price_cents),active=CASE WHEN ?='A' THEN active ELSE 0 END,
-     bling_synced_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP WHERE code=?`,
+     bling_synced_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+     WHERE bling_product_id=? OR (bling_product_id IS NULL AND code=?)`,
   ).bind(
     String(product.id), official, official, official, official,
-    priceCents, product.situacao || "A", code,
+    priceCents, product.situacao || "A", String(product.id), code,
   ).run();
   return (result.meta?.changes || 0) > 0;
 }
@@ -284,8 +285,12 @@ export async function applyBlingProductWebhook(data: unknown) {
   const result = await env.DB.prepare(
     `UPDATE products SET bling_product_id=?,price_cents=COALESCE(?,price_cents),
      active=CASE WHEN ?='I' THEN 0 ELSE active END,bling_synced_at=CURRENT_TIMESTAMP,
-     updated_at=CURRENT_TIMESTAMP WHERE code=?`,
-  ).bind(String(product.id), priceCents, product.situacao || "A", code).run();
+     updated_at=CURRENT_TIMESTAMP
+     WHERE bling_product_id=? OR (bling_product_id IS NULL AND code=?)`,
+  ).bind(
+    String(product.id), priceCents, product.situacao || "A",
+    String(product.id), code,
+  ).run();
   return (result.meta?.changes || 0) > 0;
 }
 
