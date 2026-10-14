@@ -21,6 +21,7 @@ import VehicleFinder from "./vehicle-finder";
 import StoreHeader from "./store-header";
 import StoreFooter from "./store-footer";
 import catalogSource from "@/public/catalog.json";
+import activeProductCodes from "@/public/active-products.json";
 
 type Product = {
   id: string;
@@ -71,7 +72,7 @@ const mapProduct = (p: ApiProduct): Product => ({
   tone: "#e31b2d",
 });
 const initialProducts = (catalogSource as StaticProduct[])
-  .slice(0, 60)
+  .filter((product) => activeProductCodes.includes(product.code))
   .map((p) => mapProduct({ ...p, priceCents: null, stockQuantity: null, imageUrl: null }));
 const money = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
