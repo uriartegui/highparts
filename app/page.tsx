@@ -21,6 +21,7 @@ import VehicleFinder from "./vehicle-finder";
 import StoreHeader from "./store-header";
 import StoreFooter from "./store-footer";
 import catalogSource from "@/public/catalog.json";
+import activeProductCodes from "@/public/active-products.json";
 
 type Product = {
   id: string;
@@ -31,6 +32,7 @@ type Product = {
   stock: number | null;
   badge?: string;
   tone: string;
+  imageUrl: string | null;
 };
 type ApiProduct = {
   code: string;
@@ -40,6 +42,7 @@ type ApiProduct = {
   type: string;
   priceCents: number | null;
   stockQuantity: number | null;
+  imageUrl: string | null;
 };
 type StaticProduct = {
   code: string;
@@ -61,6 +64,7 @@ const mapProduct = (p: ApiProduct): Product => ({
   fit: `${p.application}${p.axle ? ` • ${p.axle}` : ""}`,
   price: p.priceCents == null ? null : p.priceCents / 100,
   stock: p.stockQuantity,
+  imageUrl: p.imageUrl,
   badge:
     p.priceCents != null && p.stockQuantity && p.stockQuantity > 0
       ? "Disponível"
@@ -68,8 +72,8 @@ const mapProduct = (p: ApiProduct): Product => ({
   tone: "#e31b2d",
 });
 const initialProducts = (catalogSource as StaticProduct[])
-  .slice(0, 60)
-  .map((p) => mapProduct({ ...p, priceCents: null, stockQuantity: null }));
+  .filter((product) => activeProductCodes.includes(product.code))
+  .map((p) => mapProduct({ ...p, priceCents: null, stockQuantity: null, imageUrl: null }));
 const money = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -98,11 +102,17 @@ function featuredCompatibility(fit: string) {
 function PartVisual({ product }: { product: Product }) {
   return (
     <div
-      className="part"
+      className={`part ${product.imageUrl ? "has-product-image" : ""}`}
       style={{ "--tone": product.tone } as React.CSSProperties}
     >
-      <i />
-      <b>{product.category}</b>
+      {product.imageUrl ? (
+        <img src={product.imageUrl} alt={`${product.name} ${product.id}`} />
+      ) : (
+        <>
+          <i />
+          <b>{product.category}</b>
+        </>
+      )}
     </div>
   );
 }

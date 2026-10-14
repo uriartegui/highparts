@@ -2,6 +2,7 @@
 
 import { Bot, Check, ChevronLeft, ChevronRight, Disc3, Gauge, Search, ShieldCheck, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import activeProductCodes from "@/public/active-products.json";
 
 type CatalogItem = { code:string; application:string; axle:string; product:string; type:string; hub:string; original:string };
 type Vehicle = { brand:string; model:string; version:string; year:string; engine?:string|null };
@@ -39,7 +40,7 @@ export default function VehicleFinder(){
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState("");
 
-  useEffect(()=>{fetch("/catalog.json").then(r=>r.json()).then(setCatalog).catch(()=>setCatalog([]))},[]);
+  useEffect(()=>{fetch("/catalog.json").then(r=>r.json() as Promise<CatalogItem[]>).then(items=>setCatalog(items.filter(item=>activeProductCodes.includes(item.code)))).catch(()=>setCatalog([]))},[]);
   const normalized=identifier.toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,7);
   const brands=useMemo(()=>Array.from(new Set(catalog.flatMap(item=>Array.from(item.application.matchAll(/\[([^\]]+)\]/g),match=>match[1].trim())).filter(brand=>/^[A-ZÀ-Ü][A-ZÀ-Ü .-]{1,24}$/i.test(brand)))).sort((a,b)=>a.localeCompare(b,"pt-BR")),[catalog]);
   const vehicleCatalog=useMemo(()=>{

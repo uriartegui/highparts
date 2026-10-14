@@ -7,10 +7,11 @@ if (!CLOUDFLARE_API_TOKEN || !CLOUDFLARE_ACCOUNT_ID || !CLOUDFLARE_D1_DATABASE_I
 }
 
 const catalog = JSON.parse(await readFile(new URL("../public/catalog.json", import.meta.url), "utf8"));
+const publishedCodes = new Set(JSON.parse(await readFile(new URL("../public/active-products.json", import.meta.url), "utf8")));
 const endpoint = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database/${CLOUDFLARE_D1_DATABASE_ID}/query`;
 for (let start = 0; start < catalog.length; start += 10) {
   const batch = catalog.slice(start, start + 10);
-  const values = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, 1)").join(", ");
+  const values = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
   const sql = `INSERT INTO products (code, original_code, application, axle, product, type, hub, active)
 VALUES ${values}
 ON CONFLICT(code) DO UPDATE SET
@@ -20,6 +21,7 @@ ON CONFLICT(code) DO UPDATE SET
   product=excluded.product,
   type=excluded.type,
   hub=excluded.hub,
+  active=excluded.active,
   updated_at=CURRENT_TIMESTAMP`;
   const params = batch.flatMap((item) => [
     item.code,
@@ -29,6 +31,7 @@ ON CONFLICT(code) DO UPDATE SET
     item.product,
     item.type,
     item.hub,
+    publishedCodes.has(item.code) ? 1 : 0,
   ]);
   const response = await fetch(endpoint, {
     method: "POST",
