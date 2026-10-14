@@ -270,6 +270,7 @@ export default function ProductPage() {
     product.priceCents != null &&
     product.stockQuantity != null &&
     product.stockQuantity > 0;
+  const soldAsPair = clean(product.product).includes("DISCO DE FREIO");
   const applications = parseApplications(product.application);
   const galleryImages = product.images?.length
     ? product.images
@@ -416,11 +417,26 @@ export default function ProductPage() {
               </div>
             )}
           </div>
+          {soldAsPair && (
+            <div className="product-sale-unit">
+              <PackageCheck />
+              <span>
+                <b>Venda padrão: 1 par com 2 discos</b>
+                <small>
+                  Precisa de somente 1 disco? Fale com o suporte antes de
+                  realizar o pedido.
+                </small>
+              </span>
+            </div>
+          )}
           <div className="product-price-box">
             {available ? (
               <>
                 <strong>{money(product.priceCents! / 100)}</strong>
-                <span>{product.stockQuantity} unidades disponíveis</span>
+                <span>
+                  {product.stockQuantity}{" "}
+                  {soldAsPair ? "pares" : "unidades"} disponíveis
+                </span>
                 <button onClick={add}>
                   <ShoppingCart />
                   {added ? "Adicionado ao carrinho" : "Adicionar ao carrinho"}
