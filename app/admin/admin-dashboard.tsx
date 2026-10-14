@@ -167,19 +167,6 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
     setSyncing(false);
     if (response.ok) await loadBling();
   };
-  const sync = async () => {
-    setSyncing(true);
-    setMessage("");
-    const r = await fetch("/api/admin/catalog/sync", { method: "POST" });
-    const d = (await r.json()) as { imported?: number; error?: string };
-    setMessage(
-      r.ok
-        ? `${(d.imported ?? 0).toLocaleString("pt-BR")} produtos sincronizados.`
-        : d.error || "Falha ao sincronizar.",
-    );
-    setSyncing(false);
-    if (r.ok) loadProducts();
-  };
   const save = async (p: Product) => {
     const r = await fetch(`/api/admin/catalog/${encodeURIComponent(p.code)}`, {
       method: "PATCH",
@@ -292,7 +279,7 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
             </h1>
             <p>
               {tab === "inventory"
-                ? "Informe preço, saldo e imagem para liberar cada produto na loja."
+                ? "Acompanhe somente os produtos publicados. Preço e estoque oficiais vêm do Bling."
                 : tab === "orders"
                   ? "Consulte clientes, valores e atualize o andamento de cada venda."
                   : tab === "finance"
@@ -300,12 +287,6 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
                     : "Conecte o ERP e acompanhe a fonte oficial de estoque."}
             </p>
           </div>
-          {tab === "inventory" && (
-            <button onClick={sync} disabled={syncing}>
-              {syncing ? <LoaderCircle className="spin" /> : <RefreshCw />}
-              {syncing ? "Sincronizando..." : "Sincronizar planilha"}
-            </button>
-          )}
           {tab === "integrations" && bling?.connected && (
             <button onClick={syncBling} disabled={syncing}>
               {syncing ? <LoaderCircle className="spin" /> : <RefreshCw />}
@@ -325,7 +306,7 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
               <>
                 <Card
                   icon={<Database />}
-                  label="Produtos importados"
+                  label="Produtos publicados"
                   value={summary.products}
                 />
                 <Card
@@ -748,7 +729,6 @@ function Inventory({
                 <th>Preço</th>
                 <th>Estoque</th>
                 <th>Imagem</th>
-                <th>Ativo</th>
                 <th></th>
               </tr>
             </thead>
@@ -1136,40 +1116,10 @@ function ProductRow({
         </small>
       </td>
       <td>
-        <label>
-          R$
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={p.priceCents == null ? "" : (p.priceCents / 100).toFixed(2)}
-            onChange={(e) =>
-              onChange({
-                ...p,
-                priceCents:
-                  e.target.value === ""
-                    ? null
-                    : Math.round(Number(e.target.value) * 100),
-              })
-            }
-          />
-        </label>
+        <b>{p.priceCents == null ? "Aguardando Bling" : money(p.priceCents)}</b>
       </td>
       <td>
-        <input
-          className="stock-input"
-          type="number"
-          min="0"
-          value={p.stockQuantity ?? ""}
-          placeholder="—"
-          onChange={(e) =>
-            onChange({
-              ...p,
-              stockQuantity:
-                e.target.value === "" ? null : Number(e.target.value),
-            })
-          }
-        />
+        <b>{p.stockQuantity == null ? "Aguardando Bling" : p.stockQuantity}</b>
       </td>
       <td>
         <input
@@ -1180,14 +1130,6 @@ function ProductRow({
           aria-label={`Imagem de ${p.code}`}
           onChange={(e) => onChange({ ...p, imageUrl: e.target.value || null })}
         />
-      </td>
-      <td>
-        <button
-          className={`toggle ${p.active ? "on" : ""}`}
-          onClick={() => onChange({ ...p, active: !p.active })}
-        >
-          <i />
-        </button>
       </td>
       <td>
         <button className="save-product" onClick={onSave}>

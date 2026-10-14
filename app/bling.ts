@@ -172,7 +172,7 @@ export async function blingStatus() {
     `SELECT COUNT(*) AS total,
      SUM(CASE WHEN bling_product_id IS NOT NULL THEN 1 ELSE 0 END) AS linked,
      SUM(CASE WHEN inventory_source='bling' THEN 1 ELSE 0 END) AS official
-     FROM products`,
+     FROM products WHERE active=1`,
   ).first<{ total: number; linked: number; official: number }>();
   return {
     configured: blingConfigured(),
