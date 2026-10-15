@@ -152,6 +152,7 @@ export default function ProductPage() {
     vehicle?: Vehicle;
   } | null>(null);
   useEffect(() => {
+    setSelectedImage(null);
     const recent = JSON.parse(
       localStorage.getItem("highparts_recent") || "[]",
     ) as string[];
