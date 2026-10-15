@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { blob, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const products = sqliteTable("products", {
   code: text("code").primaryKey(), originalCode: text("original_code").notNull().default(""),
@@ -9,6 +9,13 @@ export const products = sqliteTable("products", {
   active: integer("active", { mode: "boolean" }).notNull().default(true), imageUrl: text("image_url"),
   updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   emailVerifiedAt: text("email_verified_at"),
+});
+
+export const productUploadedImages = sqliteTable("product_uploaded_images", {
+  productCode: text("product_code").primaryKey().references(() => products.code, { onDelete: "cascade" }),
+  content: blob("content", { mode: "buffer" }).notNull(),
+  contentType: text("content_type").notNull(), etag: text("etag").notNull(),
+  updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
 });
 
 export const orders = sqliteTable("orders", {

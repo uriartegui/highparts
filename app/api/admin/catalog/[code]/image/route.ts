@@ -6,15 +6,13 @@ const ALLOWED_TYPES = new Map([
   ["image/png", "png"],
   ["image/webp", "webp"],
 ]);
-const MAX_BYTES = 5 * 1024 * 1024;
+const MAX_BYTES = 1024 * 1024;
 
 export async function POST(request: Request, { params }: { params: Promise<{ code: string }> }) {
   if (!await getAdmin()) return Response.json({ error: "Não autorizado" }, { status: 403 });
-  if (!env.BUCKET) return Response.json({ error: "O armazenamento de imagens ainda não está configurado." }, { status: 503 });
-
   const { code: encodedCode } = await params;
   const code = decodeURIComponent(encodedCode);
-  const product = await env.DB.prepare("SELECT image_url AS imageUrl FROM products WHERE code=?").bind(code).first<{ imageUrl: string | null }>();
+  const product = await env.DB.prepare("SELECT code FROM products WHERE code=?").bind(code).first<{ code: string }>();
   if (!product) return Response.json({ error: "Produto não encontrado." }, { status: 404 });
 
   const form = await request.formData();
@@ -22,24 +20,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ cod
   if (!(image instanceof File)) return Response.json({ error: "Selecione uma imagem." }, { status: 400 });
   const extension = ALLOWED_TYPES.get(image.type);
   if (!extension) return Response.json({ error: "Use uma imagem JPG, PNG ou WebP." }, { status: 400 });
-  if (!image.size || image.size > MAX_BYTES) return Response.json({ error: "A imagem deve ter no máximo 5 MB." }, { status: 400 });
+  if (!image.size || image.size > MAX_BYTES) return Response.json({ error: "A imagem compactada deve ter no máximo 1 MB." }, { status: 400 });
 
-  const safeCode = code.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "produto";
-  const key = `products/${safeCode}/${crypto.randomUUID()}.${extension}`;
-  await env.BUCKET.put(key, image.stream(), {
-    httpMetadata: { contentType: image.type, cacheControl: "public, max-age=31536000, immutable" },
-    customMetadata: { productCode: code },
-  });
-
-  const imageUrl = `/media/${key}`;
-  try {
-    await env.DB.prepare("UPDATE products SET image_url=?,updated_at=CURRENT_TIMESTAMP WHERE code=?").bind(imageUrl, code).run();
-  } catch (error) {
-    await env.BUCKET.delete(key);
-    throw error;
-  }
-
-  const oldKey = product.imageUrl?.startsWith("/media/") ? product.imageUrl.slice("/media/".length) : null;
-  if (oldKey && oldKey !== key) await env.BUCKET.delete(oldKey).catch(() => undefined);
+  const content = await image.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", content);
+  const etag = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const imageUrl = `/media/product/${encodeURIComponent(code)}?v=${etag.slice(0, 12)}`;
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO product_uploaded_images(product_code,content,content_type,etag,updated_at)
+      VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(product_code) DO UPDATE SET
+      content=excluded.content,content_type=excluded.content_type,etag=excluded.etag,updated_at=CURRENT_TIMESTAMP`)
+      .bind(code, content, image.type, etag),
+    env.DB.prepare("UPDATE products SET image_url=?,updated_at=CURRENT_TIMESTAMP WHERE code=?").bind(imageUrl, code),
+  ]);
   return Response.json({ imageUrl });
 }

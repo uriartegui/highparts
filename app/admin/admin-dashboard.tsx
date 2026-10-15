@@ -77,6 +77,22 @@ type BlingStatus = {
   products: { total: number; linked: number; official: number; drafts: number };
 };
 type InventoryFilter = "all" | "bling-draft" | "missing-price" | "missing-stock" | "ready";
+async function prepareProductImage(file: File) {
+  if (!file.type.startsWith("image/")) throw new Error("Selecione uma imagem válida.");
+  if (file.size > 12 * 1024 * 1024) throw new Error("A imagem original deve ter no máximo 12 MB.");
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1400 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Não foi possível preparar a imagem.");
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", .8));
+  if (!blob || blob.size > 1024 * 1024) throw new Error("Não foi possível compactar a imagem para menos de 1 MB.");
+  return new File([blob], "produto.webp", { type: "image/webp" });
+}
 const statusLabels: Record<string, string> = {
   awaiting_payment: "Aguardando pagamento",
   paid: "Pago",
@@ -1132,8 +1148,16 @@ function ProductRow({
   const uploadImage = async (file?: File) => {
     if (!file) return;
     setUploading(true);
+    let prepared: File;
+    try {
+      prepared = await prepareProductImage(file);
+    } catch (error) {
+      setUploading(false);
+      window.alert(error instanceof Error ? error.message : "Não foi possível preparar a imagem.");
+      return;
+    }
     const form = new FormData();
-    form.set("image", file);
+    form.set("image", prepared);
     const response = await fetch(`/api/admin/catalog/${encodeURIComponent(p.code)}/image`, {
       method: "POST",
       body: form,
@@ -1154,7 +1178,7 @@ function ProductRow({
       <button className="upload-image" type="button" disabled={uploading} onClick={() => fileInput.current?.click()}>
         {uploading ? <LoaderCircle className="spin" /> : <Upload />} {uploading ? "Enviando..." : "Enviar imagem"}
       </button>
-      <small>JPG, PNG ou WebP · máximo 5 MB</small>
+      <small>JPG, PNG ou WebP · compactação automática</small>
     </div>
   );
   if (p.blingDraft) return (
