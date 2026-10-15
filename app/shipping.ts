@@ -66,6 +66,19 @@ type MelhorEnvioService = {
   company?: { name?: string; picture?: string };
 };
 
+// true only when ViaCEP positively answers that the CEP doesn't exist; any
+// network problem returns false so the caller falls back to "unavailable".
+async function postalCodeIsUnknown(postalCode: string) {
+  try {
+    const response = await fetch(`https://viacep.com.br/ws/${postalCode}/json/`, { signal: AbortSignal.timeout(4000) });
+    if (!response.ok) return response.status === 400;
+    const data = (await response.json()) as { erro?: boolean | string };
+    return data.erro === true || data.erro === "true";
+  } catch {
+    return false;
+  }
+}
+
 async function cacheKey(payload: unknown) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify(payload)));
   const hex = [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -125,9 +138,10 @@ export async function quoteShipping(postalCodeInput: unknown, requested: Shippin
   const cached = await cache?.match(key).catch(() => undefined);
   if (cached) return (await cached.json()) as ShippingOption[];
 
-  let services: MelhorEnvioService[];
+  const unavailable = () => new ShippingError("UNAVAILABLE", "O cálculo de frete está indisponível agora. Tente novamente em instantes.");
+  let response: Response;
   try {
-    const response = await fetch(`${apiBase()}/api/v2/me/shipment/calculate`, {
+    response = await fetch(`${apiBase()}/api/v2/me/shipment/calculate`, {
       method: "POST",
       headers: {
         accept: "application/json",
@@ -138,14 +152,25 @@ export async function quoteShipping(postalCodeInput: unknown, requested: Shippin
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(10000),
     });
-    if (!response.ok) {
-      console.error("melhor_envio_quote_failed", response.status, (await response.text().catch(() => "")).slice(0, 300));
-      throw new Error("quote_failed");
-    }
-    services = (await response.json()) as MelhorEnvioService[];
   } catch {
-    throw new ShippingError("UNAVAILABLE", "O cálculo de frete está indisponível agora. Tente novamente em instantes.");
+    throw unavailable();
   }
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => "")).slice(0, 300);
+    if (response.status === 401 || response.status === 403) {
+      console.error("melhor_envio_auth_failed", response.status, detail);
+      throw unavailable();
+    }
+    console.warn("melhor_envio_quote_rejected", response.status, postalCode, detail);
+    // A 4xx rejection (not auth/rate limit) usually means a CEP that doesn't
+    // exist. Only then do we double-check with ViaCEP, so a valid CEP that
+    // ViaCEP lacks (e.g. large-customer CEPs) is never blocked; outages (5xx,
+    // 429) skip the check and stay "unavailable".
+    if (response.status >= 400 && response.status < 500 && response.status !== 429 && await postalCodeIsUnknown(postalCode))
+      throw new ShippingError("INVALID_POSTAL_CODE", "Não encontramos esse CEP. Confira os números e tente novamente.");
+    throw unavailable();
+  }
+  const services = (await response.json().catch(() => [])) as MelhorEnvioService[];
 
   const options = (Array.isArray(services) ? services : [])
     .filter((service) => !service.error && service.id != null && Number(service.custom_price ?? service.price) > 0)
