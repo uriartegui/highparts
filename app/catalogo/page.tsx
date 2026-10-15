@@ -4,7 +4,12 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  CircleDotDashed,
+  CircleGauge,
+  Cylinder,
+  Disc3,
   Filter,
+  LayoutGrid,
   PackageSearch,
   Search,
   ShoppingCart,
@@ -30,10 +35,10 @@ type CatalogResponse = { products: Product[]; total: number; facets: Facets };
 const money = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const featuredCategories = [
-  "DISCO DE FREIO",
-  "TAMBOR DE FREIO",
-  "CUBO DE RODA",
-  "CILINDRO MESTRE",
+  { value: "DISCO DE FREIO", label: "Disco de freio", Icon: Disc3 },
+  { value: "TAMBOR DE FREIO", label: "Tambor de freio", Icon: CircleDotDashed },
+  { value: "CUBO DE RODA", label: "Cubo de roda", Icon: CircleGauge },
+  { value: "CILINDRO MESTRE", label: "Cilindro mestre", Icon: Cylinder },
 ];
 
 function CatalogPageContent() {
@@ -298,18 +303,18 @@ function CatalogPageContent() {
                 setPage(1);
               }}
             >
-              Todas
+              <LayoutGrid /> Todas
             </button>
             {featuredCategories.map((item) => (
               <button
-                key={item}
-                className={category === item ? "active" : ""}
+                key={item.value}
+                className={category === item.value ? "active" : ""}
                 onClick={() => {
-                  setCategory(item);
+                  setCategory(item.value);
                   setPage(1);
                 }}
               >
-                {item.toLocaleLowerCase("pt-BR")}
+                <item.Icon /> {item.label}
               </button>
             ))}
           </nav>
