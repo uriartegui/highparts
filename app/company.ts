@@ -17,7 +17,8 @@ export const COMPANY = {
   supportEmail: "contato@highparts.com.br",
   phone: "(48) 9160-0517",
   whatsapp: "", // digits only with country code, e.g. "5548999999999"
-  hours: "", // e.g. "Segunda a sexta, das 9h às 18h"
+  instagram: "https://www.instagram.com/high.parts",
+  hours: "Segunda a sexta, das 7h às 18h",
   privacyContact: {
     // Encarregado pelo tratamento de dados pessoais (LGPD, art. 41).
     name: "",
