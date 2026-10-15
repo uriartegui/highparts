@@ -24,6 +24,7 @@ import {
 
 type Product = {
   code: string;
+  originalCode: string;
   product: string;
   application: string;
   axle: string;
@@ -32,12 +33,15 @@ type Product = {
   stockQuantity: number | null;
   imageUrl: string | null;
   active: boolean;
+  blingDraft: boolean;
+  blingName: string | null;
 };
 type Summary = {
   products: number;
   priced: number;
   stockDefined: number;
   orders: number;
+  drafts: number;
 };
 type Order = {
   id: string;
@@ -69,9 +73,9 @@ type BlingStatus = {
   connected: boolean;
   enabled: boolean;
   credentialUpdatedAt: string | null;
-  products: { total: number; linked: number; official: number };
+  products: { total: number; linked: number; official: number; drafts: number };
 };
-type InventoryFilter = "all" | "missing-price" | "missing-stock" | "ready";
+type InventoryFilter = "all" | "bling-draft" | "missing-price" | "missing-stock" | "ready";
 const statusLabels: Record<string, string> = {
   awaiting_payment: "Aguardando pagamento",
   paid: "Pago",
@@ -94,6 +98,7 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
     priced: 0,
     stockDefined: 0,
     orders: 0,
+    drafts: 0,
   });
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -155,17 +160,20 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
   };
   const syncBling = async () => {
     if (!window.confirm(
-      "Importar agora? O Bling passará a ser a fonte oficial de preço e estoque dos produtos com o mesmo SKU.",
+      "Sincronizar agora? Produtos com SKU conhecido serão atualizados e produtos novos entrarão como rascunho para revisão.",
     )) return;
     setSyncing(true);
     setMessage("");
     const response = await fetch("/api/admin/bling/sync", { method: "POST" });
-    const result = await response.json().catch(() => ({})) as { seen?: number; linked?: number; error?: string };
+    const result = await response.json().catch(() => ({})) as { seen?: number; linked?: number; drafts?: number; error?: string };
     setMessage(response.ok
-      ? `${result.linked || 0} de ${result.seen || 0} produtos do Bling vinculados por SKU.`
+      ? `${result.linked || 0} de ${result.seen || 0} produtos do Bling processados. ${result.drafts || 0} aguardando revisão.`
       : result.error || "Falha ao sincronizar o Bling.");
     setSyncing(false);
-    if (response.ok) await loadBling();
+    if (response.ok) {
+      await loadBling();
+      setInventoryFilter("bling-draft");
+    }
   };
   const save = async (p: Product) => {
     const r = await fetch(`/api/admin/catalog/${encodeURIComponent(p.code)}`, {
@@ -176,6 +184,10 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
         stockQuantity: p.stockQuantity,
         imageUrl: p.imageUrl,
         active: p.active,
+        product: p.product,
+        application: p.application,
+        axle: p.axle,
+        originalCode: p.originalCode,
       }),
     });
     const result = (await r.json().catch(() => ({}))) as { error?: string };
@@ -279,7 +291,7 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
             </h1>
             <p>
               {tab === "inventory"
-                ? "Acompanhe somente os produtos publicados. Preço e estoque oficiais vêm do Bling."
+                ? "Revise produtos novos do Bling e publique somente depois de completar os dados técnicos."
                 : tab === "orders"
                   ? "Consulte clientes, valores e atualize o andamento de cada venda."
                   : tab === "finance"
@@ -308,6 +320,11 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
                   icon={<Database />}
                   label="Produtos publicados"
                   value={summary.products}
+                />
+                <Card
+                  icon={<PackageSearch />}
+                  label="Rascunhos do Bling"
+                  value={summary.drafts}
                 />
                 <Card
                   icon={<PackageSearch />}
@@ -405,6 +422,7 @@ function BlingIntegration({ status, loading }: { status: BlingStatus | null; loa
         <article><small>Produtos no site</small><b>{status.products.total}</b></article>
         <article><small>SKUs vinculados</small><b>{status.products.linked}</b></article>
         <article><small>Estoque pelo Bling</small><b>{status.products.official}</b></article>
+        <article><small>Aguardando revisão</small><b>{status.products.drafts}</b></article>
       </div>
       <div className="integration-note">
         <ShieldCheck />
@@ -680,6 +698,12 @@ function Inventory({
     <div className="inventory">
       <div className="inventory-filters">
         <button
+          className={filter === "bling-draft" ? "active" : ""}
+          onClick={() => setFilter("bling-draft")}
+        >
+          Novos do Bling
+        </button>
+        <button
           className={filter === "all" ? "active" : ""}
           onClick={() => setFilter("all")}
         >
@@ -740,7 +764,7 @@ function Inventory({
                   onChange={(next) =>
                     setProducts(products.map((x, n) => (n === i ? next : x)))
                   }
-                  onSave={() => save(p)}
+                  onSave={(next) => save(next || p)}
                 />
               ))}
             </tbody>
@@ -1100,8 +1124,43 @@ function ProductRow({
 }: {
   product: Product;
   onChange: (p: Product) => void;
-  onSave: () => void;
+  onSave: (product?: Product) => void;
 }) {
+  if (p.blingDraft) return (
+    <tr className="bling-draft-row">
+      <td>
+        <b>{p.code}</b>
+        <small className="draft-badge">NOVO DO BLING</small>
+      </td>
+      <td>
+        <small>Nome no Bling</small>
+        <b>{p.blingName || "Produto sem nome"}</b>
+        <label>Categoria
+          <input value={p.product} placeholder="Ex.: DISCO DE FREIO" onChange={(e) => onChange({ ...p, product: e.target.value })} />
+        </label>
+        <label>Aplicações compatíveis
+          <textarea value={p.application} placeholder="Ex.: [VW] GOL 1.6 2018>2022" onChange={(e) => onChange({ ...p, application: e.target.value })} />
+        </label>
+        <div className="draft-inline-fields">
+          <label>Eixo
+            <select value={p.axle} onChange={(e) => onChange({ ...p, axle: e.target.value })}>
+              <option value="">Selecione</option><option value="DIANTEIRO">Dianteiro</option><option value="TRASEIRO">Traseiro</option><option value="DIANTEIRO / TRASEIRO">Dianteiro / traseiro</option>
+            </select>
+          </label>
+          <label>Referências
+            <input value={p.originalCode} placeholder="Códigos originais" onChange={(e) => onChange({ ...p, originalCode: e.target.value })} />
+          </label>
+        </div>
+      </td>
+      <td><b>{p.priceCents == null ? "Aguardando Bling" : money(p.priceCents)}</b></td>
+      <td><b>{p.stockQuantity == null ? "Aguardando Bling" : p.stockQuantity}</b></td>
+      <td><input className="image-input" type="url" value={p.imageUrl ?? ""} placeholder="https://... ou /products/..." aria-label={`Imagem de ${p.code}`} onChange={(e) => onChange({ ...p, imageUrl: e.target.value || null })} /></td>
+      <td className="draft-actions">
+        <button className="save-product secondary-save" onClick={() => onSave(p)}><Save /> Salvar rascunho</button>
+        <button className="save-product publish-product" onClick={() => onSave({ ...p, active: true })}><Check /> Publicar</button>
+      </td>
+    </tr>
+  );
   return (
     <tr>
       <td>

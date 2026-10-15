@@ -174,6 +174,7 @@ export async function blingStatus() {
      SUM(CASE WHEN inventory_source='bling' THEN 1 ELSE 0 END) AS official
      FROM products WHERE active=1`,
   ).first<{ total: number; linked: number; official: number }>();
+  const draftCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM products WHERE bling_draft=1").first<{ count: number }>();
   return {
     configured: blingConfigured(),
     connected: Boolean(credential),
@@ -183,6 +184,7 @@ export async function blingStatus() {
       total: Number(counts?.total || 0),
       linked: Number(counts?.linked || 0),
       official: Number(counts?.official || 0),
+      drafts: Number(draftCount?.count || 0),
     },
   };
 }
@@ -210,6 +212,8 @@ async function applyBlingProduct(product: BlingProduct) {
     : null;
   const result = await env.DB.prepare(
     `UPDATE products SET bling_product_id=?,bling_stock_quantity=COALESCE(?,bling_stock_quantity),
+     bling_name=COALESCE(NULLIF(?,''),bling_name),
+     bling_draft=CASE WHEN active=0 AND bling_product_id IS NULL THEN 1 ELSE bling_draft END,
      inventory_source=CASE WHEN ? IS NULL THEN inventory_source ELSE 'bling' END,
      stock_quantity=CASE WHEN ? IS NULL THEN stock_quantity ELSE MAX(0,?-COALESCE((
        SELECT SUM(i.quantity) FROM order_snapshot_items i JOIN orders o ON o.id=i.order_id
@@ -220,10 +224,20 @@ async function applyBlingProduct(product: BlingProduct) {
      bling_synced_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
      WHERE bling_product_id=? OR (bling_product_id IS NULL AND code=?)`,
   ).bind(
-    String(product.id), official, official, official, official,
+    String(product.id), official, String(product.nome || "").trim(), official, official, official,
     priceCents, product.situacao || "A", String(product.id), code,
   ).run();
-  return (result.meta?.changes || 0) > 0;
+  if ((result.meta?.changes || 0) > 0) return true;
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO products
+     (code,original_code,application,axle,product,type,hub,price_cents,stock_quantity,active,
+      bling_product_id,bling_stock_quantity,inventory_source,bling_synced_at,bling_draft,bling_name)
+     VALUES (?,'','','','','','',?,?,0,?,?,?,CURRENT_TIMESTAMP,1,?)`,
+  ).bind(
+    code, priceCents, official, String(product.id), official,
+    official === null ? "manual" : "bling", String(product.nome || "").trim(),
+  ).run();
+  return (inserted.meta?.changes || 0) > 0;
 }
 
 export async function syncBlingInventory() {
@@ -241,7 +255,8 @@ export async function syncBlingInventory() {
     page++;
     if (page > 1000) throw new Error("A sincronização excedeu o limite de segurança.");
   }
-  return { seen, linked };
+  const drafts = await env.DB.prepare("SELECT COUNT(*) AS count FROM products WHERE bling_draft=1").first<{ count: number }>();
+  return { seen, linked, drafts: Number(drafts?.count || 0) };
 }
 
 export async function verifyBlingWebhook(rawBody: string, signature: string) {
@@ -283,20 +298,16 @@ export async function applyBlingStockWebhook(data: unknown) {
 }
 
 export async function applyBlingProductWebhook(data: unknown) {
-  const product = data as { id?: number; codigo?: string; preco?: number; situacao?: string };
+  const product = data as { id?: number; codigo?: string; nome?: string; preco?: number; situacao?: string };
   const code = String(product.codigo || "").trim();
   if (!product.id || !code) return false;
-  const priceCents = Number.isFinite(Number(product.preco)) ? Math.max(0, Math.round(Number(product.preco) * 100)) : null;
-  const result = await env.DB.prepare(
-    `UPDATE products SET bling_product_id=?,price_cents=COALESCE(?,price_cents),
-     active=CASE WHEN ?='I' THEN 0 ELSE active END,bling_synced_at=CURRENT_TIMESTAMP,
-     updated_at=CURRENT_TIMESTAMP
-     WHERE bling_product_id=? OR (bling_product_id IS NULL AND code=?)`,
-  ).bind(
-    String(product.id), priceCents, product.situacao || "A",
-    String(product.id), code,
-  ).run();
-  return (result.meta?.changes || 0) > 0;
+  const detail = await blingRequest<{ data?: BlingProduct }>(`/produtos/${product.id}`)
+    .then((response) => response.data)
+    .catch(() => undefined);
+  return applyBlingProduct(detail || {
+    id: product.id, codigo: code, nome: product.nome,
+    preco: product.preco, situacao: product.situacao,
+  });
 }
 
 async function refreshBlingStock(productIds: string[]) {
