@@ -16,10 +16,12 @@ import {
   Truck,
   X,
   Zap,
+  ChevronDown,
 } from "lucide-react";
 import VehicleFinder from "./vehicle-finder";
 import StoreHeader from "./store-header";
 import StoreFooter from "./store-footer";
+import { cheapestAndFastest, featuredOptions } from "./shipping-options";
 import catalogSource from "@/public/catalog.json";
 import activeProductCodes from "@/public/active-products.json";
 
@@ -688,6 +690,7 @@ function Checkout({
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingError, setShippingError] = useState("");
   const [shippingRefresh, setShippingRefresh] = useState(0);
+  const [showAllShipping, setShowAllShipping] = useState(false);
   const [delivery, setDelivery] = useState({
     postalCode: "",
     street: "",
@@ -738,6 +741,7 @@ function Checkout({
             return;
           }
           setShippingOptions(data.options);
+          setShowAllShipping(false);
           setShippingId((current) => (data.options!.some((option) => option.id === current) ? current : data.options![0].id));
         })
         .catch(() => !cancelled && setShippingError("Não foi possível calcular o frete agora. Tente novamente."))
@@ -749,6 +753,9 @@ function Checkout({
     };
   }, [delivery.postalCode, quoteItems, shippingRefresh]);
   const selectedShipping = shippingOptions.find((option) => option.id === shippingId) || null;
+  const shippingBadges = cheapestAndFastest(shippingOptions);
+  const featuredShipping = featuredOptions(shippingOptions, shippingId);
+  const visibleShipping = showAllShipping ? shippingOptions : featuredShipping;
   const orderTotal = subtotal + (selectedShipping?.priceCents ?? 0) / 100;
   function chooseAddress(id: string) {
     setSelectedAddress(id);
@@ -1082,17 +1089,29 @@ function Checkout({
               ) : shippingError ? (
                 <p className="shipping-error">{shippingError}</p>
               ) : (
-                shippingOptions.map((option) => (
+                <>
+                {visibleShipping.map((option) => (
                   <label key={option.id} className={`shipping-option${option.id === shippingId ? " active" : ""}`}>
                     <input type="radio" name="shippingService" value={option.id} checked={option.id === shippingId} onChange={() => setShippingId(option.id)} />
                     {option.logo ? <img src={option.logo} alt="" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /> : <span className="shipping-logo-fallback" />}
                     <span>
-                      <b>{option.carrier} · {option.service}</b>
+                      <b>
+                        {option.carrier} · {option.service}
+                        {option.id === shippingBadges.cheapest && <em className="tag cheap">Mais barato</em>}
+                        {option.id === shippingBadges.fastest && <em className="tag fast">Mais rápido</em>}
+                      </b>
                       <small>Chega em até {option.deliveryDays} {option.deliveryDays === 1 ? "dia útil" : "dias úteis"} após a confirmação do pagamento</small>
                     </span>
                     <strong>{money(option.priceCents / 100)}</strong>
                   </label>
-                ))
+                ))}
+                {shippingOptions.length > featuredShipping.length && (
+                  <button type="button" className="hp-shipping-more" aria-expanded={showAllShipping} onClick={() => setShowAllShipping((value) => !value)}>
+                    {showAllShipping ? "Mostrar menos" : `Ver todas as opções (${shippingOptions.length})`}
+                    <ChevronDown className={showAllShipping ? "flip" : ""} />
+                  </button>
+                )}
+                </>
               )}
             </div>
           </FormCard>

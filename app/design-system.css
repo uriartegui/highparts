@@ -331,3 +331,14 @@
 .hp-shipping-list .tag.cheap { background: var(--hp-success-bg); color: var(--hp-success); }
 .hp-shipping-list .tag.fast { background: #eef4ff; color: #0b5bd3; }
 @media (max-width: 420px) { .hp-shipping-list li { grid-template-columns: minmax(0, 1fr) auto; } .hp-shipping-list img, .hp-shipping-logo { display: none; } }
+
+/* ---------- Shipping: "ver todas" toggle and badges in checkout ---------- */
+.hp-shipping-more { justify-self: center; display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 8px 14px; border: 0; border-radius: 999px; background: transparent; color: #0066cc; font-size: 13px; font-weight: 600; cursor: pointer; }
+.hp-shipping-more:hover { background: rgba(0, 102, 204, 0.08); }
+.hp-shipping-more svg { width: 16px; height: 16px; transition: transform 0.25s var(--hp-ease); }
+.hp-shipping-more svg.flip { transform: rotate(180deg); }
+.checkout form .shipping-options .hp-shipping-more { width: auto; height: auto; }
+.shipping-option b { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.shipping-option .tag { font-style: normal; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; }
+.shipping-option .tag.cheap { background: var(--hp-success-bg); color: var(--hp-success); }
+.shipping-option .tag.fast { background: #eef4ff; color: #0b5bd3; }
