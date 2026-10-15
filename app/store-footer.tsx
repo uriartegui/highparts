@@ -1,9 +1,21 @@
-import { ChevronRight } from "lucide-react";
+import { Barcode, ChevronRight, CreditCard, Mail, MapPin, Phone, QrCode, ShieldCheck } from "lucide-react";
 import { COMPANY, formatAddress, whatsappLink } from "./company";
+
+const paymentMethods = [
+  { icon: QrCode, label: "Pix", detail: "aprovação rápida" },
+  { icon: CreditCard, label: "Cartões", detail: "crédito e débito" },
+  { icon: Barcode, label: "Boleto", detail: "pagamento bancário" },
+  { icon: ShieldCheck, label: "Mercado Pago", detail: "ambiente protegido" },
+];
+
+function InstagramMark() {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" /></svg>;
+}
 
 export default function StoreFooter() {
   const address = formatAddress();
   const whatsapp = whatsappLink();
+  const instagram = COMPANY.instagram;
   return (
     <footer className="store-footer" id="suporte">
       <div className="footer-main">
@@ -11,6 +23,19 @@ export default function StoreFooter() {
           <img src="/highparts-logo.png" alt="HighParts" />
           <p>Performance, confiança e a peça certa para o seu carro.</p>
           <span>Compatibilidade técnica para comprar com mais segurança.</span>
+          <div className="footer-social">
+            {instagram ? (
+              <a href={instagram} target="_blank" rel="noopener noreferrer" aria-label="Instagram da HighParts">
+                <InstagramMark />
+                <span><b>Instagram</b><small>Acompanhe a HighParts</small></span>
+              </a>
+            ) : (
+              <div title="Adicione o perfil oficial em app/company.ts">
+                <InstagramMark />
+                <span><b>Instagram</b><small>Perfil oficial em breve</small></span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="footer-column">
           <b>COMPRAR</b>
@@ -20,29 +45,39 @@ export default function StoreFooter() {
           <a href="/conta">Meus pedidos</a>
         </div>
         <div className="footer-column">
-          <b>ATENDIMENTO</b>
+          <b>INSTITUCIONAL</b>
           <a href={`mailto:${COMPANY.supportEmail}`}>Fale com a HighParts</a>
-          {whatsapp && <a href={whatsapp} target="_blank" rel="noopener noreferrer">WhatsApp</a>}
           <a href="/trocas-e-devolucoes">Trocas e devoluções</a>
           <a href="/privacidade">Política de privacidade</a>
           <a href="/termos">Termos de uso</a>
         </div>
         <div className="footer-contact">
-          <b>PRECISA DE AJUDA?</b>
-          <h3>Confirme antes de comprar.</h3>
-          <p>Nossa equipe ajuda a verificar a aplicação correta para o seu veículo.{COMPANY.hours && ` ${COMPANY.hours}.`}</p>
-          <a href={`mailto:${COMPANY.supportEmail}`}>
-            {COMPANY.supportEmail} <ChevronRight />
-          </a>
-          {COMPANY.phone && <a href={`tel:${COMPANY.phone.replace(/\D/g, "")}`}>{COMPANY.phone} <ChevronRight /></a>}
+          <b>ATENDIMENTO</b>
+          <h3>Fale com quem entende.</h3>
+          <p>Confirme a aplicação correta da peça antes de comprar.{COMPANY.hours && ` ${COMPANY.hours}.`}</p>
+          {whatsapp && <a className="footer-contact-primary" href={whatsapp} target="_blank" rel="noopener noreferrer"><Phone /> WhatsApp <ChevronRight /></a>}
+          <a href={`mailto:${COMPANY.supportEmail}`}><Mail /> {COMPANY.supportEmail} <ChevronRight /></a>
+          {COMPANY.phone && <a href={`tel:${COMPANY.phone.replace(/\D/g, "")}`}><Phone /> {COMPANY.phone} <ChevronRight /></a>}
         </div>
       </div>
+      <section className="footer-payments" aria-labelledby="footer-payment-title">
+        <div className="footer-payment-heading">
+          <span><ShieldCheck /></span>
+          <div><b id="footer-payment-title">PAGAMENTO SEGURO</b><p>Escolha a melhor forma de pagar</p></div>
+        </div>
+        <div className="footer-payment-list">
+          {paymentMethods.map(({ icon: Icon, label, detail }) => (
+            <div key={label} className="footer-payment-method"><Icon /><span><b>{label}</b><small>{detail}</small></span></div>
+          ))}
+        </div>
+        <p className="footer-payment-note">Pagamentos processados pelo Mercado Pago. A HighParts não armazena os dados do seu cartão.</p>
+      </section>
       {/* Seller identification required by Decreto 7.962/2013, art. 2. */}
       <div className="footer-legal">
         <small>
           <b>{COMPANY.legalName}</b>
           {COMPANY.cnpj && <> · CNPJ {COMPANY.cnpj}</>}
-          {address && <> · {address}</>}
+          {address && <><br /><MapPin /> {address}</>}
         </small>
       </div>
       <div className="footer-bottom">
