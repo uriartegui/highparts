@@ -9,13 +9,17 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return Response.json({ error: "Pagamento ainda não configurado." }, { status: 503 });
   const { id } = await context.params;
   const order = await env.DB.prepare(
-    "SELECT id,status,customer_name AS customerName,customer_email AS customerEmail " +
+    "SELECT id,status,customer_name AS customerName,customer_email AS customerEmail," +
+    "shipping_cents AS shippingCents,shipping_carrier AS shippingCarrier,shipping_service AS shippingService " +
     "FROM orders WHERE id=? AND user_id=?",
   ).bind(id, user.id).first<{
     id: string;
     status: string;
     customerName: string;
     customerEmail: string;
+    shippingCents: number;
+    shippingCarrier: string | null;
+    shippingService: string | null;
   }>();
   if (!order) return Response.json({ error: "Pedido não encontrado." }, { status: 404 });
   if (!["awaiting_payment", "payment_failed"].includes(order.status))
@@ -29,6 +33,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     orderId: id,
     payer: { name: order.customerName, email: order.customerEmail },
     items: items.results as Array<{ code: string; name: string; quantity: number; unitPriceCents: number }>,
+    shipping: { cents: Number(order.shippingCents || 0), label: [order.shippingCarrier, order.shippingService].filter(Boolean).join(" ") || "Entrega" },
   });
   await env.DB.prepare(
     "UPDATE orders SET payment_provider='mercado_pago',payment_reference=?,payment_mode=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",

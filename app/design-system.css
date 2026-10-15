@@ -275,3 +275,34 @@
 .hp-company-id span { color: var(--hp-muted); }
 .hp-company-id b { font-weight: 600; color: var(--hp-ink); overflow-wrap: anywhere; }
 @media (max-width: 560px) { .hp-company-id li { grid-template-columns: 1fr; gap: 2px; padding: 10px 16px; } }
+
+/* ---------- Admin: shipping data fields ---------- */
+.admin-shipping-fields { display: grid; gap: 6px; min-width: 190px; }
+.admin-shipping-fields label { display: grid; gap: 2px; }
+.admin-shipping-fields small { font-size: 10px; color: var(--hp-muted); }
+.admin-shipping-fields input { height: 32px; width: 100%; padding: 0 8px; border: 1px solid var(--hp-line-strong); border-radius: 8px; font-size: 12px; background: #fff; }
+.admin-shipping-fields .dims { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.admin-shipping-fields .shipping-hint { font-size: 10px; color: var(--hp-faint); }
+.shipping-badge { justify-self: start; padding: 3px 9px; border-radius: 999px; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
+.shipping-badge.missing { background: var(--hp-danger-bg); color: var(--hp-danger); }
+.shipping-badge.from-bling { background: var(--hp-success-bg); color: var(--hp-success); }
+.shipping-badge.manual { background: #eef4ff; color: #0b5bd3; }
+
+/* ---------- Checkout: shipping options ---------- */
+.shipping-options { display: grid; gap: 8px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--hp-line); }
+.shipping-options > b { font-size: 13px; color: var(--hp-ink); }
+.shipping-hint { margin: 0; font-size: 12px; color: var(--hp-muted); }
+.shipping-error { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--hp-danger-bg); color: var(--hp-danger); font-size: 12px; }
+.checkout form .shipping-options label.shipping-option, .shipping-option { display: grid; grid-template-columns: 18px 44px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--hp-line-strong); border-radius: 14px; background: #fff; cursor: pointer; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.shipping-option:hover { border-color: rgba(0, 0, 0, 0.28); }
+.shipping-option.active { border-color: var(--hp-ink); box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06); }
+.shipping-option input { accent-color: var(--hp-red); width: 16px; height: 16px; margin: 0; }
+.shipping-option img, .shipping-logo-fallback { width: 44px; height: 28px; object-fit: contain; border-radius: 6px; background: var(--hp-bg); }
+.shipping-option b { display: block; font-size: 13px; color: var(--hp-ink); }
+.shipping-option small { display: block; font-size: 11px; color: var(--hp-muted); margin-top: 2px; }
+.shipping-option strong { font-size: 14px; color: var(--hp-ink); white-space: nowrap; }
+@media (max-width: 560px) { .checkout form .shipping-options label.shipping-option, .shipping-option { grid-template-columns: 18px minmax(0, 1fr) auto; } .shipping-option img, .shipping-logo-fallback { display: none; } }
+
+.checkout form .shipping-options label.shipping-option { font-size: inherit; margin: 0; }
+.checkout form .shipping-options label.shipping-option > span:not(.shipping-logo-fallback) { display: block; }
+@media (max-width: 560px) { .checkout form .shipping-options label.shipping-option > .shipping-logo-fallback, .checkout form .shipping-options label.shipping-option > img { display: none; } }

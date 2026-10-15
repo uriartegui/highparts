@@ -682,6 +682,12 @@ function Checkout({
   >([]);
   const [selectedAddress, setSelectedAddress] = useState("");
   const [cepLoading, setCepLoading] = useState(false);
+  type ShippingOption = { id: string; carrier: string; service: string; priceCents: number; deliveryDays: number; logo: string | null };
+  const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
+  const [shippingId, setShippingId] = useState("");
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingError, setShippingError] = useState("");
+  const [shippingRefresh, setShippingRefresh] = useState(0);
   const [delivery, setDelivery] = useState({
     postalCode: "",
     street: "",
@@ -705,6 +711,45 @@ function Checkout({
         }
       });
   }, []);
+  // Quote freight whenever the destination CEP or the cart changes. The server
+  // recalculates the chosen option again when the order is created.
+  const quoteItems = JSON.stringify(
+    [...new Set(items.map((p) => p.id))].map((id) => ({ code: id, quantity: items.filter((x) => x.id === id).length })),
+  );
+  useEffect(() => {
+    const cep = delivery.postalCode.replace(/\D/g, "");
+    setShippingOptions([]);
+    setShippingError("");
+    if (cep.length !== 8 || quoteItems === "[]") return;
+    let cancelled = false;
+    setShippingLoading(true);
+    const timer = setTimeout(() => {
+      fetch("/api/shipping/quote", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ postalCode: cep, items: JSON.parse(quoteItems) }),
+      })
+        .then(async (response) => {
+          const data = (await response.json().catch(() => ({}))) as { options?: ShippingOption[]; error?: string };
+          if (cancelled) return;
+          if (!response.ok || !data.options?.length) {
+            setShippingError(data.error || "Não foi possível calcular o frete para este CEP.");
+            setShippingId("");
+            return;
+          }
+          setShippingOptions(data.options);
+          setShippingId((current) => (data.options!.some((option) => option.id === current) ? current : data.options![0].id));
+        })
+        .catch(() => !cancelled && setShippingError("Não foi possível calcular o frete agora. Tente novamente."))
+        .finally(() => !cancelled && setShippingLoading(false));
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [delivery.postalCode, quoteItems, shippingRefresh]);
+  const selectedShipping = shippingOptions.find((option) => option.id === shippingId) || null;
+  const orderTotal = subtotal + (selectedShipping?.priceCents ?? 0) / 100;
   function chooseAddress(id: string) {
     setSelectedAddress(id);
     const address = addresses.find((item) => item.id === id);
@@ -745,6 +790,10 @@ function Checkout({
   }
   async function finish(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!selectedShipping) {
+      setError("Escolha uma opção de frete para continuar.");
+      return;
+    }
     setSaving(true);
     setError("");
     const fields = Object.fromEntries(new FormData(event.currentTarget));
@@ -779,11 +828,13 @@ function Checkout({
         postalCode: delivery.postalCode,
         address: `${delivery.street}, ${delivery.number}${delivery.complement ? `, ${delivery.complement}` : ""} - ${delivery.neighborhood ? `${delivery.neighborhood}, ` : ""}${delivery.city}/${delivery.state}`,
         vehiclePlate: "",
+        shippingServiceId: selectedShipping.id,
         items: grouped,
       }),
     });
     const result = (await response.json()) as {
       error?: string;
+      code?: string;
       order?: { id: string };
       payment?: { checkoutUrl?: string; message?: string };
     };
@@ -791,6 +842,7 @@ function Checkout({
       location.href = "/entrar?returnTo=/";
       return;
     }
+    if (result.code === "SHIPPING_CHANGED") setShippingRefresh((value) => value + 1);
     if (!response.ok || !result.order) {
       setError(result.error ?? "Não foi possível criar o pedido.");
       setSaving(false);
@@ -1021,6 +1073,28 @@ function Checkout({
                 />
               </label>
             </div>
+            <div className="shipping-options" aria-live="polite">
+              <b>Opções de frete</b>
+              {delivery.postalCode.replace(/\D/g, "").length !== 8 ? (
+                <p className="shipping-hint">Informe o CEP para ver prazos e valores.</p>
+              ) : shippingLoading ? (
+                <p className="shipping-hint">Calculando frete…</p>
+              ) : shippingError ? (
+                <p className="shipping-error">{shippingError}</p>
+              ) : (
+                shippingOptions.map((option) => (
+                  <label key={option.id} className={`shipping-option${option.id === shippingId ? " active" : ""}`}>
+                    <input type="radio" name="shippingService" value={option.id} checked={option.id === shippingId} onChange={() => setShippingId(option.id)} />
+                    {option.logo ? <img src={option.logo} alt="" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /> : <span className="shipping-logo-fallback" />}
+                    <span>
+                      <b>{option.carrier} · {option.service}</b>
+                      <small>Chega em até {option.deliveryDays} {option.deliveryDays === 1 ? "dia útil" : "dias úteis"} após a confirmação do pagamento</small>
+                    </span>
+                    <strong>{money(option.priceCents / 100)}</strong>
+                  </label>
+                ))
+              )}
+            </div>
           </FormCard>
           <FormCard
             number="3"
@@ -1055,11 +1129,11 @@ function Checkout({
           {error && <p className="checkout-error">{error}</p>}
           <button
             className="finish"
-            disabled={!items.length || saving || !user.emailVerifiedAt}
+            disabled={!items.length || saving || !user.emailVerifiedAt || !selectedShipping}
           >
             {saving
               ? "Salvando pedido..."
-              : `Ir para o pagamento • ${money(subtotal)}`}{" "}
+              : `Ir para o pagamento • ${money(orderTotal)}`}{" "}
             <ChevronRight />
           </button>
         </form>
@@ -1082,11 +1156,11 @@ function Checkout({
             </p>
             <p>
               <span>Frete</span>
-              <b>{subtotal >= 499 ? "Grátis" : "A calcular"}</b>
+              <b>{selectedShipping ? money(selectedShipping.priceCents / 100) : "Informe o CEP"}</b>
             </p>
             <p>
               <span>Total</span>
-              <strong>{money(subtotal)}</strong>
+              <strong>{money(orderTotal)}</strong>
             </p>
           </div>
           <div className="secure">

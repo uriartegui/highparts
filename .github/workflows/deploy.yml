@@ -46,6 +46,7 @@ jobs:
           BLING_INTEGRATION_ENABLED: ${{ vars.BLING_INTEGRATION_ENABLED }}
           BLING_PAYMENT_METHOD_ID: ${{ vars.BLING_PAYMENT_METHOD_ID }}
           BLING_PAID_ORDER_STATUS_ID: ${{ vars.BLING_PAID_ORDER_STATUS_ID }}
+          MELHOR_ENVIO_ENV: ${{ vars.MELHOR_ENVIO_ENV }}
 
       - name: Apply database migrations
         uses: cloudflare/wrangler-action@v4

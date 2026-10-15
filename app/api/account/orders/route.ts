@@ -4,6 +4,7 @@ import {
   createMercadoPagoPreference,
   mercadoPagoConfigured,
 } from "../../../mercado-pago";
+import { quoteShipping, ShippingError } from "../../../shipping";
 
 export async function GET() {
   const user = await requireUser();
@@ -13,6 +14,7 @@ export async function GET() {
       `SELECT o.id,o.total_cents AS totalCents,o.status,o.payment_provider AS paymentProvider,
     o.vehicle_plate AS vehiclePlate,o.shipping_address AS shippingAddress,
     o.shipping_carrier AS shippingCarrier,o.shipping_service AS shippingService,
+    o.shipping_cents AS shippingCents,o.shipping_delivery_days AS shippingDeliveryDays,
     o.tracking_code AS trackingCode,o.shipped_at AS shippedAt,o.created_at AS createdAt,
     COALESCE((SELECT SUM(i.quantity) FROM order_snapshot_items i WHERE i.order_id=o.id),0) AS itemCount
     FROM orders o WHERE o.user_id=? ORDER BY o.created_at DESC`,
@@ -62,6 +64,7 @@ export async function POST(request: Request) {
     postalCode?: string;
     address?: string;
     vehiclePlate?: string;
+    shippingServiceId?: string;
     items?: Array<{ itemKey: string; quantity: number }>;
   };
   const requested = (input.items ?? [])
@@ -128,10 +131,30 @@ export async function POST(request: Request) {
     };
     quantity: number;
   }>;
-  const total = validItems.reduce(
+  const itemsTotal = validItems.reduce(
     (sum, item) => sum + item.product.priceCents * item.quantity,
     0,
   );
+  // Freight is recalculated here from the delivery CEP and the server-side
+  // product data; the client only chooses which quoted service to use.
+  let shipping;
+  try {
+    const options = await quoteShipping(
+      input.postalCode,
+      validItems.map((item) => ({ code: item.product.code, quantity: item.quantity })),
+    );
+    shipping = options.find((option) => option.id === String(input.shippingServiceId ?? ""));
+  } catch (error) {
+    if (error instanceof ShippingError)
+      return Response.json({ error: error.message, code: error.code }, { status: error.code === "INVALID_POSTAL_CODE" ? 400 : 422 });
+    throw error;
+  }
+  if (!shipping)
+    return Response.json(
+      { error: "A opção de frete escolhida não está mais disponível. Calcule o frete novamente.", code: "SHIPPING_CHANGED" },
+      { status: 409 },
+    );
+  const total = itemsTotal + shipping.priceCents;
   // Random suffix: two checkouts in the same millisecond must not collide.
   const id = `HP-${Date.now().toString(36).toUpperCase()}${crypto.getRandomValues(new Uint8Array(2)).reduce((code, byte) => code + byte.toString(36).toUpperCase().padStart(2, "0"), "")}`;
   const text = (value: unknown, max: number) => String(value ?? "").trim().slice(0, max);
@@ -166,8 +189,9 @@ export async function POST(request: Request) {
 
   const statements = [
     env.DB.prepare(
-      `INSERT INTO orders (id,user_id,customer_name,customer_email,customer_phone,postal_code,shipping_address,vehicle_plate,total_cents,status,payment_provider)
-      VALUES (?,?,?,?,?,?,?,?,?,'awaiting_payment','pending_provider')`,
+      `INSERT INTO orders (id,user_id,customer_name,customer_email,customer_phone,postal_code,shipping_address,vehicle_plate,total_cents,
+      shipping_cents,shipping_carrier,shipping_service,shipping_service_id,shipping_delivery_days,status,payment_provider)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'awaiting_payment','pending_provider')`,
     ).bind(
       id,
       user.id,
@@ -178,6 +202,11 @@ export async function POST(request: Request) {
       text(input.address, 300),
       text(input.vehiclePlate, 8).toUpperCase(),
       total,
+      shipping.priceCents,
+      shipping.carrier,
+      shipping.service,
+      shipping.id,
+      shipping.deliveryDays,
     ),
     ...validItems.map((item) =>
       env.DB.prepare(
@@ -221,6 +250,7 @@ export async function POST(request: Request) {
           quantity: item.quantity,
           unitPriceCents: item.product.priceCents,
         })),
+        shipping: { cents: shipping.priceCents, label: `${shipping.carrier} ${shipping.service}` },
       });
       await env.DB.prepare(
         "UPDATE orders SET payment_provider='mercado_pago',payment_reference=?,payment_mode=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
@@ -232,7 +262,7 @@ export async function POST(request: Request) {
   }
   return Response.json(
     {
-      order: { id, totalCents: total, status: "awaiting_payment" },
+      order: { id, totalCents: total, shippingCents: shipping.priceCents, status: "awaiting_payment" },
       payment,
     },
     { status: 201 },
