@@ -196,7 +196,30 @@ type BlingProduct = {
   preco?: number;
   situacao?: string;
   estoque?: { saldoVirtualTotal?: number };
+  pesoBruto?: number;
+  pesoLiquido?: number;
+  dimensoes?: { largura?: number; altura?: number; profundidade?: number; unidadeMedida?: number };
 };
+
+// Weight/dimensions only come with the product detail (GET /produtos/{id}), not
+// with the list. Bling stores weight in kg and dimensions in the unit given by
+// unidadeMedida (0 = metros, 1 = centímetros, 2 = milímetros). Missing or zero
+// values return null so they never overwrite data typed in the admin.
+function blingShippingData(product: BlingProduct) {
+  const kg = Number(product.pesoBruto) > 0 ? Number(product.pesoBruto) : Number(product.pesoLiquido);
+  const unit = Number(product.dimensoes?.unidadeMedida ?? 1);
+  const factor = unit === 0 ? 100 : unit === 2 ? 0.1 : 1;
+  const cm = (value: unknown) => {
+    const result = Number(value) * factor;
+    return Number.isFinite(result) && result > 0 ? Math.round(result * 10) / 10 : null;
+  };
+  return {
+    weightGrams: Number.isFinite(kg) && kg > 0 ? Math.round(kg * 1000) : null,
+    lengthCm: cm(product.dimensoes?.profundidade),
+    widthCm: cm(product.dimensoes?.largura),
+    heightCm: cm(product.dimensoes?.altura),
+  };
+}
 
 async function applyBlingProduct(product: BlingProduct) {
   const blingCode = String(product.codigo || "").trim();
@@ -210,8 +233,13 @@ async function applyBlingProduct(product: BlingProduct) {
   const official = hasOfficialStock
     ? Math.max(0, Math.floor(Number(product.estoque?.saldoVirtualTotal)))
     : null;
+  const shipping = blingShippingData(product);
+  const hasShipping = Object.values(shipping).some((value) => value !== null) ? 1 : 0;
   const result = await env.DB.prepare(
     `UPDATE products SET bling_product_id=?,bling_stock_quantity=COALESCE(?,bling_stock_quantity),
+     weight_grams=COALESCE(?,weight_grams),length_cm=COALESCE(?,length_cm),
+     width_cm=COALESCE(?,width_cm),height_cm=COALESCE(?,height_cm),
+     shipping_data_source=CASE WHEN ?=1 THEN 'bling' ELSE shipping_data_source END,
      bling_name=COALESCE(NULLIF(?,''),bling_name),
      bling_draft=CASE WHEN active=0 AND bling_product_id IS NULL THEN 1 ELSE bling_draft END,
      inventory_source=CASE WHEN ? IS NULL THEN inventory_source ELSE 'bling' END,
@@ -224,18 +252,22 @@ async function applyBlingProduct(product: BlingProduct) {
      bling_synced_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
      WHERE bling_product_id=? OR (bling_product_id IS NULL AND code=?)`,
   ).bind(
-    String(product.id), official, String(product.nome || "").trim(), official, official, official,
+    String(product.id), official,
+    shipping.weightGrams, shipping.lengthCm, shipping.widthCm, shipping.heightCm, hasShipping,
+    String(product.nome || "").trim(), official, official, official,
     priceCents, product.situacao || "A", String(product.id), code,
   ).run();
   if ((result.meta?.changes || 0) > 0) return true;
   const inserted = await env.DB.prepare(
     `INSERT OR IGNORE INTO products
      (code,original_code,application,axle,product,type,hub,price_cents,stock_quantity,active,
-      bling_product_id,bling_stock_quantity,inventory_source,bling_synced_at,bling_draft,bling_name)
-     VALUES (?,'','','','','','',?,?,0,?,?,?,CURRENT_TIMESTAMP,1,?)`,
+      bling_product_id,bling_stock_quantity,inventory_source,bling_synced_at,bling_draft,bling_name,
+      weight_grams,length_cm,width_cm,height_cm,shipping_data_source)
+     VALUES (?,'','','','','','',?,?,0,?,?,?,CURRENT_TIMESTAMP,1,?,?,?,?,?,?)`,
   ).bind(
     code, priceCents, official, String(product.id), official,
     official === null ? "manual" : "bling", String(product.nome || "").trim(),
+    shipping.weightGrams, shipping.lengthCm, shipping.widthCm, shipping.heightCm, hasShipping ? "bling" : null,
   ).run();
   return (inserted.meta?.changes || 0) > 0;
 }
@@ -270,8 +302,23 @@ export async function syncBlingInventory() {
        WHERE bling_product_id=?`,
     ).bind(productId)));
   }
+  // The list endpoint has no weight/dimensions, so read the detail of linked
+  // products that still lack shipping data (paced to respect Bling's rate limit).
+  const missingShipping = await env.DB.prepare(
+    `SELECT bling_product_id AS blingProductId FROM products
+     WHERE (active=1 OR bling_draft=1) AND bling_product_id IS NOT NULL
+     AND (weight_grams IS NULL OR length_cm IS NULL OR width_cm IS NULL OR height_cm IS NULL) LIMIT 40`,
+  ).all<{ blingProductId: string }>();
+  let shippingUpdated = 0;
+  for (const row of missingShipping.results) {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    const detail = await blingRequest<{ data?: BlingProduct }>(`/produtos/${encodeURIComponent(row.blingProductId)}`)
+      .then((response) => response.data)
+      .catch(() => undefined);
+    if (detail && await applyBlingProduct(detail)) shippingUpdated++;
+  }
   const drafts = await env.DB.prepare("SELECT COUNT(*) AS count FROM products WHERE bling_draft=1").first<{ count: number }>();
-  return { seen, linked, deactivated: removedIds.length, drafts: Number(drafts?.count || 0) };
+  return { seen, linked, deactivated: removedIds.length, drafts: Number(drafts?.count || 0), shippingUpdated };
 }
 
 export async function verifyBlingWebhook(rawBody: string, signature: string) {
@@ -358,6 +405,9 @@ type OrderRow = {
   postalCode: string;
   shippingAddress: string;
   totalCents: number;
+  shippingCents: number;
+  shippingCarrier: string | null;
+  shippingService: string | null;
   status: string;
   blingOrderId: string | null;
 };
@@ -433,7 +483,8 @@ export async function syncOrderToBling(orderId: string) {
   const order = await env.DB.prepare(
     `SELECT id,customer_name AS customerName,customer_email AS customerEmail,
      customer_phone AS customerPhone,postal_code AS postalCode,shipping_address AS shippingAddress,
-     total_cents AS totalCents,status,bling_order_id AS blingOrderId FROM orders WHERE id=?`,
+     total_cents AS totalCents,shipping_cents AS shippingCents,shipping_carrier AS shippingCarrier,
+     shipping_service AS shippingService,status,bling_order_id AS blingOrderId FROM orders WHERE id=?`,
   ).bind(orderId).first<OrderRow>();
   if (!order) throw new Error("Pedido não encontrado para sincronizar com o Bling.");
   if (order.blingOrderId) return { id: order.blingOrderId, duplicate: true };
@@ -485,6 +536,14 @@ export async function syncOrderToBling(orderId: string) {
         observacoes: `Mercado Pago · pedido ${order.id}`,
         formaPagamento: { id: paymentMethodId },
       }],
+      // Freight paid by the customer; items + frete must add up to the parcel total.
+      ...(Number(order.shippingCents) > 0 ? {
+        transporte: {
+          fretePorConta: 0,
+          frete: Number(order.shippingCents) / 100,
+          volumes: [{ servico: [order.shippingCarrier, order.shippingService].filter(Boolean).join(" ").slice(0, 60) }],
+        },
+      } : {}),
       observacoesInternas: `Pedido pago no site HighParts. Referência: ${order.id}`,
     };
     const created = await blingRequest<{ data?: { id?: number } }>("/pedidos/vendas", {

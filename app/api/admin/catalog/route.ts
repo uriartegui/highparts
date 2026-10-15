@@ -14,8 +14,9 @@ export async function GET(request:Request){
   if(status==="missing-stock")conditions.push("stock_quantity IS NULL");
   if(status==="ready")conditions.push("price_cents IS NOT NULL AND stock_quantity>0");
   if(status==="bling-draft")conditions.push("bling_draft=1");
+  if(status==="missing-shipping")conditions.push("(weight_grams IS NULL OR length_cm IS NULL OR width_cm IS NULL OR height_cm IS NULL)");
   const where=conditions.length?`WHERE ${conditions.join(" AND ")}`:"";
-  const query=env.DB.prepare(`SELECT code,original_code AS originalCode,product,application,axle,type,price_cents AS priceCents,stock_quantity AS stockQuantity,image_url AS imageUrl,active,bling_draft AS blingDraft,bling_name AS blingName FROM products ${where} ORDER BY bling_draft DESC,code LIMIT 100`);
+  const query=env.DB.prepare(`SELECT code,original_code AS originalCode,product,application,axle,type,price_cents AS priceCents,stock_quantity AS stockQuantity,image_url AS imageUrl,active,bling_draft AS blingDraft,bling_name AS blingName,weight_grams AS weightGrams,length_cm AS lengthCm,width_cm AS widthCm,height_cm AS heightCm,shipping_data_source AS shippingDataSource FROM products ${where} ORDER BY bling_draft DESC,code LIMIT 100`);
   const products=q?await query.bind(pattern,pattern,pattern).all():await query.all();
   const stats=await env.DB.batch([
     env.DB.prepare("SELECT COUNT(*) AS value FROM products WHERE active=1"),

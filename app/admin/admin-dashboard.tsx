@@ -36,6 +36,11 @@ type Product = {
   active: boolean;
   blingDraft: boolean;
   blingName: string | null;
+  weightGrams: number | null;
+  lengthCm: number | null;
+  widthCm: number | null;
+  heightCm: number | null;
+  shippingDataSource: "bling" | "manual" | null;
 };
 type Summary = {
   products: number;
@@ -76,7 +81,7 @@ type BlingStatus = {
   credentialUpdatedAt: string | null;
   products: { total: number; linked: number; official: number; drafts: number };
 };
-type InventoryFilter = "all" | "bling-draft" | "missing-price" | "missing-stock" | "ready";
+type InventoryFilter = "all" | "bling-draft" | "missing-price" | "missing-stock" | "missing-shipping" | "ready";
 async function prepareProductImage(file: File) {
   if (!file.type.startsWith("image/")) throw new Error("Selecione uma imagem válida.");
   if (file.size > 12 * 1024 * 1024) throw new Error("A imagem original deve ter no máximo 12 MB.");
@@ -205,6 +210,10 @@ export default function AdminDashboard({ adminEmail }: { adminEmail: string }) {
         application: p.application,
         axle: p.axle,
         originalCode: p.originalCode,
+        weightGrams: p.weightGrams,
+        lengthCm: p.lengthCm,
+        widthCm: p.widthCm,
+        heightCm: p.heightCm,
       }),
     });
     const result = (await r.json().catch(() => ({}))) as { error?: string };
@@ -739,6 +748,12 @@ function Inventory({
           Sem estoque
         </button>
         <button
+          className={filter === "missing-shipping" ? "active" : ""}
+          onClick={() => setFilter("missing-shipping")}
+        >
+          Sem dados de frete
+        </button>
+        <button
           className={filter === "ready" ? "active" : ""}
           onClick={() => setFilter("ready")}
         >
@@ -769,6 +784,7 @@ function Inventory({
                 <th>Produto e aplicação</th>
                 <th>Preço</th>
                 <th>Estoque</th>
+                <th>Frete</th>
                 <th>Imagem</th>
                 <th></th>
               </tr>
@@ -1209,6 +1225,7 @@ function ProductRow({
       </td>
       <td><b>{p.priceCents == null ? "Aguardando Bling" : money(p.priceCents)}</b></td>
       <td><b>{p.stockQuantity == null ? "Aguardando Bling" : p.stockQuantity}</b></td>
+      <td><ShippingFields product={p} onChange={onChange} /></td>
       <td>{imageField}</td>
       <td className="draft-actions">
         <button className="save-product secondary-save" onClick={() => onSave(p)}><Save /> Salvar rascunho</button>
@@ -1236,6 +1253,9 @@ function ProductRow({
         <b>{p.stockQuantity == null ? "Aguardando Bling" : p.stockQuantity}</b>
       </td>
       <td>
+        <ShippingFields product={p} onChange={onChange} />
+      </td>
+      <td>
         {imageField}
       </td>
       <td>
@@ -1244,5 +1264,41 @@ function ProductRow({
         </button>
       </td>
     </tr>
+  );
+}
+
+// Weight (kg) and package dimensions (cm) used for freight quotes. Values that
+// exist in Bling are synced and take precedence; the rest are typed here.
+function ShippingFields({ product: p, onChange }: { product: Product; onChange: (p: Product) => void }) {
+  const complete = Boolean(p.weightGrams && p.lengthCm && p.widthCm && p.heightCm);
+  const number = (value: string) => {
+    const parsed = Number(value.replace(",", "."));
+    return value.trim() && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+  const dimension = (key: "lengthCm" | "widthCm" | "heightCm", label: string) => (
+    <label>
+      <small>{label}</small>
+      <input type="number" min="0" step="0.1" inputMode="decimal" value={p[key] ?? ""} aria-label={`${label} (cm) de ${p.code}`}
+        onChange={(e) => onChange({ ...p, [key]: number(e.target.value) })} />
+    </label>
+  );
+  return (
+    <div className="admin-shipping-fields">
+      <span className={`shipping-badge ${complete ? (p.shippingDataSource === "bling" ? "from-bling" : "manual") : "missing"}`}>
+        {complete ? (p.shippingDataSource === "bling" ? "Do Bling" : "Manual") : "Faltando"}
+      </span>
+      <label className="weight">
+        <small>Peso (kg)</small>
+        <input type="number" min="0" step="0.01" inputMode="decimal" value={p.weightGrams == null ? "" : p.weightGrams / 1000}
+          aria-label={`Peso (kg) de ${p.code}`}
+          onChange={(e) => { const kg = number(e.target.value); onChange({ ...p, weightGrams: kg == null ? null : Math.round(kg * 1000) }); }} />
+      </label>
+      <div className="dims">
+        {dimension("lengthCm", "Compr.")}
+        {dimension("widthCm", "Larg.")}
+        {dimension("heightCm", "Alt.")}
+      </div>
+      <small className="shipping-hint">Medidas da embalagem, em cm</small>
+    </div>
   );
 }

@@ -7,6 +7,8 @@ declare namespace Cloudflare {
     TURNSTILE_SITE_KEY?: string;
     TURNSTILE_SECRET_KEY?: string;
     VEHICLE_API_TOKEN?: string;
+    MELHOR_ENVIO_TOKEN?: string;
+    MELHOR_ENVIO_ENV?: string;
     BLING_CLIENT_ID?: string;
     BLING_CLIENT_SECRET?: string;
     BLING_TOKEN_ENCRYPTION_KEY?: string;

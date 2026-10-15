@@ -51,6 +51,9 @@ export async function createMercadoPagoPreference(input: {
   orderId: string;
   payer: { name: string; email: string };
   items: CheckoutItem[];
+  // Charged as its own line so the amount paid equals the order total
+  // (the webhook compares the paid amount with orders.total_cents).
+  shipping?: { cents: number; label: string };
 }) {
   const token = accessToken();
   if (!token || !mercadoPagoConfigured(input.request)) throw new Error("MERCADO_PAGO_NOT_CONFIGURED");
@@ -71,7 +74,13 @@ export async function createMercadoPagoPreference(input: {
         currency_id: "BRL",
         quantity: item.quantity,
         unit_price: item.unitPriceCents / 100,
-      })),
+      })).concat(input.shipping && input.shipping.cents > 0 ? [{
+        id: "frete",
+        title: `Frete · ${input.shipping.label}`.slice(0, 250),
+        currency_id: "BRL",
+        quantity: 1,
+        unit_price: input.shipping.cents / 100,
+      }] : []),
       payer: { name: input.payer.name, email: input.payer.email },
       external_reference: input.orderId,
       statement_descriptor: "HIGHPARTS",

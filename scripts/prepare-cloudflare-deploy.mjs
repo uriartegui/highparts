@@ -32,6 +32,8 @@ config.vars = {
   ...(process.env.BLING_INTEGRATION_ENABLED ? { BLING_INTEGRATION_ENABLED: process.env.BLING_INTEGRATION_ENABLED } : {}),
   ...(process.env.BLING_PAYMENT_METHOD_ID ? { BLING_PAYMENT_METHOD_ID: process.env.BLING_PAYMENT_METHOD_ID } : {}),
   ...(process.env.BLING_PAID_ORDER_STATUS_ID ? { BLING_PAID_ORDER_STATUS_ID: process.env.BLING_PAID_ORDER_STATUS_ID } : {}),
+  // "sandbox" uses Melhor Envio's test environment; anything else is production.
+  ...(process.env.MELHOR_ENVIO_ENV ? { MELHOR_ENVIO_ENV: process.env.MELHOR_ENVIO_ENV } : {}),
 };
 if (!config.vars.AUTH_FROM_EMAIL) {
   console.warn("AUTH_FROM_EMAIL is not set: verification and password reset emails will not be sent.");
