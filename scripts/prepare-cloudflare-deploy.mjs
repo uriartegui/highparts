@@ -18,10 +18,6 @@ config.d1_databases = [{
   database_id: process.env.CLOUDFLARE_D1_DATABASE_ID,
   migrations_dir: "../../drizzle",
 }];
-config.r2_buckets = [{
-  binding: "BUCKET",
-  bucket_name: process.env.CLOUDFLARE_R2_BUCKET_NAME || "highparts-product-images",
-}];
 
 // Plain (non-secret) runtime vars live in the deploy config so `wrangler deploy`
 // publishes them every time; vars added only in the dashboard are removed on
