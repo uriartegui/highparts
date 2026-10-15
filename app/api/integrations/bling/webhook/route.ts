@@ -1,5 +1,10 @@
 import { env } from "cloudflare:workers";
-import { applyBlingProductWebhook, applyBlingStockWebhook, verifyBlingWebhook } from "../../../../bling";
+import {
+  applyBlingProductDeletion,
+  applyBlingProductWebhook,
+  applyBlingStockWebhook,
+  verifyBlingWebhook,
+} from "../../../../bling";
 
 type BlingEvent = {
   eventId?: string;
@@ -28,6 +33,8 @@ export async function POST(request: Request) {
     applied = await applyBlingStockWebhook(input.data);
   else if (input.event === "product.updated" || input.event === "product.created")
     applied = await applyBlingProductWebhook(input.data);
+  else if (input.event === "product.deleted")
+    applied = await applyBlingProductDeletion(input.data);
   await env.DB.prepare(
     "INSERT OR IGNORE INTO integration_events(id,provider,event_type,payload) VALUES(?,'bling',?,?)",
   ).bind(eventId, input.event, JSON.stringify({ applied })).run();

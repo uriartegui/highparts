@@ -244,19 +244,34 @@ export async function syncBlingInventory() {
   let page = 1;
   let seen = 0;
   let linked = 0;
+  const seenProductIds = new Set<string>();
   for (;;) {
     const response = await blingRequest<{ data?: BlingProduct[] }>(`/produtos?pagina=${page}&limite=100&criterio=2`);
     const products = response.data || [];
     for (const product of products) {
       seen++;
+      seenProductIds.add(String(product.id));
       if (await applyBlingProduct(product)) linked++;
     }
     if (products.length < 100) break;
     page++;
     if (page > 1000) throw new Error("A sincronização excedeu o limite de segurança.");
   }
+  const linkedProducts = await env.DB.prepare(
+    "SELECT bling_product_id AS blingProductId FROM products WHERE active=1 AND bling_product_id IS NOT NULL",
+  ).all<{ blingProductId: string }>();
+  const removedIds = linkedProducts.results
+    .map((product) => String(product.blingProductId))
+    .filter((productId) => !seenProductIds.has(productId));
+  if (removedIds.length) {
+    await env.DB.batch(removedIds.map((productId) => env.DB.prepare(
+      `UPDATE products SET active=0,bling_draft=0,stock_quantity=0,bling_stock_quantity=0,
+       inventory_source='bling',bling_synced_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+       WHERE bling_product_id=?`,
+    ).bind(productId)));
+  }
   const drafts = await env.DB.prepare("SELECT COUNT(*) AS count FROM products WHERE bling_draft=1").first<{ count: number }>();
-  return { seen, linked, drafts: Number(drafts?.count || 0) };
+  return { seen, linked, deactivated: removedIds.length, drafts: Number(drafts?.count || 0) };
 }
 
 export async function verifyBlingWebhook(rawBody: string, signature: string) {
@@ -308,6 +323,18 @@ export async function applyBlingProductWebhook(data: unknown) {
     id: product.id, codigo: code, nome: product.nome,
     preco: product.preco, situacao: product.situacao,
   });
+}
+
+export async function applyBlingProductDeletion(data: unknown) {
+  const product = data as { id?: number };
+  const productId = String(product.id || "");
+  if (!productId) return false;
+  const result = await env.DB.prepare(
+    `UPDATE products SET active=0,bling_draft=0,stock_quantity=0,bling_stock_quantity=0,
+     inventory_source='bling',bling_synced_at=CURRENT_TIMESTAMP,updated_at=CURRENT_TIMESTAMP
+     WHERE bling_product_id=?`,
+  ).bind(productId).run();
+  return (result.meta?.changes || 0) > 0;
 }
 
 async function refreshBlingStock(productIds: string[]) {
