@@ -84,7 +84,7 @@ function BrandMark({ brand }: { brand: string }) {
 }
 
 function parseApplications(value: string): ApplicationGroup[] {
-  return value
+  const parsed = value
     .split(/(?=\[[^\]]+\])/)
     .map((group) => group.trim())
     .filter(Boolean)
@@ -111,6 +111,36 @@ function parseApplications(value: string): ApplicationGroup[] {
       }
       return { brand, models };
     });
+
+  const grouped = new Map<string, ApplicationGroup>();
+  for (const group of parsed) {
+    const brandKey = group.brand.trim().toUpperCase();
+    const target = grouped.get(brandKey) || { brand: group.brand.trim(), models: [] };
+
+    for (const model of group.models) {
+      const modelKey = model.name.trim().toUpperCase().replace(/\s+/g, " ");
+      const existing = target.models.find(
+        (item) => item.name.trim().toUpperCase().replace(/\s+/g, " ") === modelKey,
+      );
+
+      if (!existing) {
+        target.models.push({ name: model.name.trim(), details: model.details.trim() });
+        continue;
+      }
+
+      const details = new Set(
+        `${existing.details} / ${model.details}`
+          .split("/")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      );
+      existing.details = [...details].join(" / ");
+    }
+
+    grouped.set(brandKey, target);
+  }
+
+  return [...grouped.values()];
 }
 
 function applicationYears(details: string) {
