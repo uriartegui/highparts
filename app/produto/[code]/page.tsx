@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import StoreHeader from "../../store-header";
 import StoreFooter from "../../store-footer";
 import { StatePanel } from "../../ui";
+import ShippingEstimator from "../../shipping-estimator";
 
 type Product = {
   code: string;
@@ -561,6 +562,7 @@ export default function ProductPage() {
               </>
             )}
           </div>
+          {available && <ShippingEstimator items={[{ code: product.code, quantity: 1 }]} />}
           <div className="product-assurances">
             <span>
               <ShieldCheck />
@@ -568,7 +570,7 @@ export default function ProductPage() {
             </span>
             <span>
               <Truck />
-              <b>Envio calculado no checkout</b>
+              <b>Entrega para todo o Brasil</b>
             </span>
           </div>
         </div>
