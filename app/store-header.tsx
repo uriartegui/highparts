@@ -2,7 +2,11 @@
 
 import {
   ChevronDown,
+  CircleDotDashed,
+  CircleGauge,
   CircleUserRound,
+  Cylinder,
+  Disc3,
   Headphones,
   Menu,
   Search,
@@ -28,19 +32,23 @@ const groups = [
       <>
         <div>
           <small>POR CATEGORIA</small>
-          <a href="/catalogo?categoria=DISCO%20DE%20FREIO">Discos de freio</a>
-          <a href="/catalogo?categoria=TAMBOR%20DE%20FREIO">
-            Tambores de freio
+          <a className="nav-category" href="/catalogo?categoria=DISCO%20DE%20FREIO">
+            <Disc3 /> <span>Discos de freio</span>
           </a>
-          <a href="/catalogo?categoria=CILINDRO%20MESTRE">Cilindros mestre</a>
-          <a href="/catalogo?categoria=CUBO%20DE%20RODA">Cubos de roda</a>
+          <a className="nav-category" href="/catalogo?categoria=TAMBOR%20DE%20FREIO">
+            <CircleDotDashed /> <span>Tambores de freio</span>
+          </a>
+          <a className="nav-category" href="/catalogo?categoria=CILINDRO%20MESTRE">
+            <Cylinder /> <span>Cilindros mestre</span>
+          </a>
+          <a className="nav-category" href="/catalogo?categoria=CUBO%20DE%20RODA">
+            <CircleGauge /> <span>Cubos de roda</span>
+          </a>
         </div>
         <div>
           <small>EXPLORAR</small>
           <a href="/catalogo">Todos os produtos</a>
           <a href="/catalogo?disponiveis=1">Pronta entrega</a>
-          <a href="/catalogo?marca=VOLKSWAGEN">Volkswagen</a>
-          <a href="/catalogo?marca=FIAT">Fiat</a>
         </div>
         <a className="nav-feature" href="/catalogo">
           <Sparkles />
