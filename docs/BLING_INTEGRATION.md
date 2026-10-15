@@ -5,6 +5,7 @@
 - O Bling é a fonte oficial de preço e estoque dos produtos vinculados.
 - O D1 mantém uma cópia rápida do saldo para a loja e desconta reservas locais que ainda não chegaram ao Bling.
 - A planilha continua alimentando descrição, aplicação, código e demais dados técnicos. Ela não deve sobrescrever o saldo oficial de itens vinculados ao Bling.
+- Um SKU novo encontrado no Bling entra no administrador como rascunho. Ele permanece fora da loja até que categoria, aplicação, eixo e imagem sejam revisados e o administrador clique em **Publicar**.
 - Um pedido pago pelo Mercado Pago entra na fila do Bling. O Worker tenta enviá-lo a cada cinco minutos e evita duplicação usando o número do pedido da loja.
 - Ao cancelar um pedido já enviado, o sistema cancela primeiro no Bling e só depois libera a reserva local.
 
@@ -32,7 +33,7 @@
    - `BLING_INTEGRATION_ENABLED`: mantenha `false` durante a homologação.
 
 6. Faça o deploy, abra **Administração > Integrações**, conecte a conta do Bling e confirme a importação.
-7. Confira se os SKUs do Bling são exatamente iguais aos códigos do catálogo. Itens sem correspondência não são alterados.
+7. Confira se os SKUs do Bling são exatamente iguais aos códigos do catálogo. Itens sem correspondência entram em **Produtos e estoque > Novos do Bling** e nunca são publicados automaticamente.
 8. Faça uma compra de baixo valor, confirme pedido, saldo e cancelamento. Somente depois altere `BLING_INTEGRATION_ENABLED` para `true` e faça novo deploy.
 
 ## Nota fiscal
