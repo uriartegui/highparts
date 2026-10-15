@@ -86,8 +86,25 @@ function applicationYears(details: string) {
     if (end >= start && end - start <= 40)
       for (let year = start; year <= end; year += 1) years.add(year);
   }
+  for (const match of details.matchAll(/(19\d{2}|20\d{2})\s*>\s*(?!\d)/g)) {
+    const start = Number(match[1]);
+    for (let year = start; year <= new Date().getFullYear(); year += 1) years.add(year);
+  }
   for (const match of details.matchAll(/(?:19|20)\d{2}/g)) years.add(Number(match[0]));
   return [...years].sort((a, b) => b - a).map(String);
+}
+
+function applicationVariants(details: string, selectedYear: string) {
+  const year = Number(selectedYear);
+  const variants = details.split("/").map((item) => item.trim()).filter(Boolean);
+  const compatible = variants.filter((variant) => {
+    const range = variant.match(/(19\d{2}|20\d{2})\s*>\s*(19\d{2}|20\d{2})?/);
+    if (!range || !Number.isFinite(year)) return true;
+    const start = Number(range[1]);
+    const end = range[2] ? Number(range[2]) : new Date().getFullYear();
+    return year >= start && year <= end;
+  });
+  return compatible.length ? compatible : variants.length ? variants : ["Aplicação cadastrada"];
 }
 
 const clean = (value: string) =>
@@ -166,12 +183,14 @@ export default function ProductPage() {
   const [compatBrand, setCompatBrand] = useState("");
   const [compatModel, setCompatModel] = useState("");
   const [compatYear, setCompatYear] = useState("");
+  const [compatVariant, setCompatVariant] = useState("");
   const [compatConfirmed, setCompatConfirmed] = useState(false);
   useEffect(() => {
     setSelectedImage(null);
     setCompatBrand("");
     setCompatModel("");
     setCompatYear("");
+    setCompatVariant("");
     setCompatConfirmed(false);
     const recent = JSON.parse(
       localStorage.getItem("highparts_recent") || "[]",
@@ -296,6 +315,9 @@ export default function ProductPage() {
   const compatGroup = applications.find((group) => group.brand === compatBrand);
   const compatModelData = compatGroup?.models.find((model) => model.name === compatModel);
   const compatYears = compatModelData ? applicationYears(compatModelData.details) : [];
+  const compatVariants = compatModelData && compatYear
+    ? applicationVariants(compatModelData.details, compatYear)
+    : [];
   const galleryImages = product.images?.length
     ? product.images
     : product.imageUrl
@@ -502,10 +524,17 @@ export default function ProductPage() {
                   type="button"
                   aria-label="Voltar uma etapa"
                   onClick={() => {
-                    if (compatConfirmed) setCompatConfirmed(false);
-                    else if (compatYear) setCompatYear("");
-                    else if (compatModel) setCompatModel("");
-                    else setCompatBrand("");
+                    if (compatConfirmed) {
+                      setCompatConfirmed(false);
+                      setCompatVariant("");
+                    } else if (compatYear) {
+                      setCompatYear("");
+                      setCompatVariant("");
+                    } else if (compatModel) {
+                      setCompatModel("");
+                    } else {
+                      setCompatBrand("");
+                    }
                   }}
                 >
                   <ArrowLeft />
@@ -522,31 +551,50 @@ export default function ProductPage() {
                 <CheckCircle2 />
                 <span>
                   Serve no <b>{compatBrand} {compatModel} {compatYear}</b>
-                  {compatModelData.details && <small>{compatModelData.details}</small>}
+                  {compatVariant && <small>{compatVariant}</small>}
                 </span>
               </div>
             ) : (
               <div className="compat-options">
                 {!compatBrand && applications.map((group) => (
-                  <button type="button" key={group.brand} onClick={() => setCompatBrand(group.brand)}>
+                  <button type="button" key={group.brand} onClick={() => {
+                    setCompatBrand(group.brand);
+                    setCompatModel("");
+                    setCompatYear("");
+                    setCompatVariant("");
+                  }}>
                     <span><small>MARCA</small><b>{group.brand}</b></span><ChevronRight />
                   </button>
                 ))}
                 {compatBrand && !compatModel && compatGroup?.models.map((model) => (
-                  <button type="button" key={model.name} onClick={() => setCompatModel(model.name)}>
+                  <button type="button" key={model.name} onClick={() => {
+                    setCompatModel(model.name);
+                    setCompatYear("");
+                    setCompatVariant("");
+                  }}>
                     <span><small>MODELO</small><b>{model.name}</b></span><ChevronRight />
                   </button>
                 ))}
                 {compatModel && !compatYear && (compatYears.length ? compatYears : ["Todos os anos cadastrados"]).map((year) => (
-                  <button type="button" key={year} onClick={() => setCompatYear(year)}>
+                  <button type="button" key={year} onClick={() => {
+                    setCompatYear(year);
+                    setCompatVariant("");
+                  }}>
                     <span><small>ANO</small><b>{year}</b></span><ChevronRight />
                   </button>
                 ))}
-                {compatYear && (
-                  <button type="button" onClick={() => setCompatConfirmed(true)}>
-                    <span><small>APLICAÇÃO</small><b>{compatModelData?.details || "Aplicação cadastrada"}</b></span><ChevronRight />
+                {compatYear && compatVariants.map((variant) => (
+                  <button
+                    type="button"
+                    key={variant}
+                    onClick={() => {
+                      setCompatVariant(variant);
+                      setCompatConfirmed(true);
+                    }}
+                  >
+                    <span><small>VERSÃO / MOTOR</small><b>{variant}</b></span><ChevronRight />
                   </button>
-                )}
+                ))}
               </div>
             )}
 
@@ -558,6 +606,7 @@ export default function ProductPage() {
                   setCompatBrand("");
                   setCompatModel("");
                   setCompatYear("");
+                  setCompatVariant("");
                   setCompatConfirmed(false);
                 }}
               >
