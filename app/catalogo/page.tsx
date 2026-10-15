@@ -34,6 +34,22 @@ type Facets = { categories: string[]; brands: string[]; axles: string[] };
 type CatalogResponse = { products: Product[]; total: number; facets: Facets };
 const money = (value: number) =>
   value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+function catalogDescription(product: Product) {
+  const category = product.product.toUpperCase();
+
+  if (category.includes("DISCO DE FREIO"))
+    return "Disco de freio para reposição automotiva. Consulte os veículos, anos e versões compatíveis nos detalhes.";
+  if (category.includes("TAMBOR DE FREIO"))
+    return "Tambor de freio para reposição automotiva. Confira medidas e aplicações completas antes da compra.";
+  if (category.includes("CILINDRO MESTRE"))
+    return "Cilindro mestre para o sistema de freio. Verifique a aplicação técnica indicada para o seu veículo.";
+  if (category.includes("CUBO DE RODA"))
+    return "Cubo de roda para reposição automotiva. Consulte a posição e a compatibilidade na página do produto.";
+
+  return "Peça para reposição automotiva com especificações e aplicações completas disponíveis nos detalhes.";
+}
+
 const featuredCategories = [
   { value: "DISCO DE FREIO", label: "Disco de freio", Icon: Disc3 },
   { value: "TAMBOR DE FREIO", label: "Tambor de freio", Icon: CircleDotDashed },
@@ -381,7 +397,7 @@ function CatalogPageContent() {
                     <a href={`/produto/${encodeURIComponent(product.code)}`}>
                       <h3>{product.product}</h3>
                     </a>
-                    <p>{product.application}</p>
+                    <p>{catalogDescription(product)}</p>
                     {product.axle && (
                       <div className="catalog-spec">
                         <b>Eixo</b>
