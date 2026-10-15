@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BarChart3,
   Boxes,
@@ -20,6 +20,7 @@ import {
   ShoppingBag,
   Truck,
   TrendingUp,
+  Upload,
 } from "lucide-react";
 
 type Product = {
@@ -1126,6 +1127,36 @@ function ProductRow({
   onChange: (p: Product) => void;
   onSave: (product?: Product) => void;
 }) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const uploadImage = async (file?: File) => {
+    if (!file) return;
+    setUploading(true);
+    const form = new FormData();
+    form.set("image", file);
+    const response = await fetch(`/api/admin/catalog/${encodeURIComponent(p.code)}/image`, {
+      method: "POST",
+      body: form,
+    });
+    const result = await response.json().catch(() => ({})) as { imageUrl?: string; error?: string };
+    setUploading(false);
+    if (!response.ok || !result.imageUrl) {
+      window.alert(result.error || "Não foi possível enviar a imagem.");
+      return;
+    }
+    onChange({ ...p, imageUrl: result.imageUrl });
+  };
+  const imageField = (
+    <div className="admin-image-field">
+      {p.imageUrl ? <img src={p.imageUrl} alt={`Imagem de ${p.code}`} /> : <div className="admin-image-placeholder">Sem imagem</div>}
+      <input className="image-input" type="url" value={p.imageUrl ?? ""} placeholder="https://... ou /products/..." aria-label={`Imagem de ${p.code}`} onChange={(e) => onChange({ ...p, imageUrl: e.target.value || null })} />
+      <input ref={fileInput} className="admin-file-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => { void uploadImage(e.target.files?.[0]); e.currentTarget.value = ""; }} />
+      <button className="upload-image" type="button" disabled={uploading} onClick={() => fileInput.current?.click()}>
+        {uploading ? <LoaderCircle className="spin" /> : <Upload />} {uploading ? "Enviando..." : "Enviar imagem"}
+      </button>
+      <small>JPG, PNG ou WebP · máximo 5 MB</small>
+    </div>
+  );
   if (p.blingDraft) return (
     <tr className="bling-draft-row">
       <td>
@@ -1154,7 +1185,7 @@ function ProductRow({
       </td>
       <td><b>{p.priceCents == null ? "Aguardando Bling" : money(p.priceCents)}</b></td>
       <td><b>{p.stockQuantity == null ? "Aguardando Bling" : p.stockQuantity}</b></td>
-      <td><input className="image-input" type="url" value={p.imageUrl ?? ""} placeholder="https://... ou /products/..." aria-label={`Imagem de ${p.code}`} onChange={(e) => onChange({ ...p, imageUrl: e.target.value || null })} /></td>
+      <td>{imageField}</td>
       <td className="draft-actions">
         <button className="save-product secondary-save" onClick={() => onSave(p)}><Save /> Salvar rascunho</button>
         <button className="save-product publish-product" onClick={() => onSave({ ...p, active: true })}><Check /> Publicar</button>
@@ -1181,14 +1212,7 @@ function ProductRow({
         <b>{p.stockQuantity == null ? "Aguardando Bling" : p.stockQuantity}</b>
       </td>
       <td>
-        <input
-          className="image-input"
-          type="url"
-          value={p.imageUrl ?? ""}
-          placeholder="https://..."
-          aria-label={`Imagem de ${p.code}`}
-          onChange={(e) => onChange({ ...p, imageUrl: e.target.value || null })}
-        />
+        {imageField}
       </td>
       <td>
         <button className="save-product" onClick={onSave}>
