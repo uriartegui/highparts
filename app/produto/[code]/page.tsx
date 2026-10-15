@@ -78,6 +78,18 @@ function parseApplications(value: string): ApplicationGroup[] {
     });
 }
 
+function applicationYears(details: string) {
+  const years = new Set<number>();
+  for (const match of details.matchAll(/(19\d{2}|20\d{2})\s*(?:>|-|a)\s*(19\d{2}|20\d{2})/gi)) {
+    const start = Number(match[1]);
+    const end = Number(match[2]);
+    if (end >= start && end - start <= 40)
+      for (let year = start; year <= end; year += 1) years.add(year);
+  }
+  for (const match of details.matchAll(/(?:19|20)\d{2}/g)) years.add(Number(match[0]));
+  return [...years].sort((a, b) => b - a).map(String);
+}
+
 const clean = (value: string) =>
   value
     .normalize("NFD")
@@ -151,8 +163,16 @@ export default function ProductPage() {
     message: string;
     vehicle?: Vehicle;
   } | null>(null);
+  const [compatBrand, setCompatBrand] = useState("");
+  const [compatModel, setCompatModel] = useState("");
+  const [compatYear, setCompatYear] = useState("");
+  const [compatConfirmed, setCompatConfirmed] = useState(false);
   useEffect(() => {
     setSelectedImage(null);
+    setCompatBrand("");
+    setCompatModel("");
+    setCompatYear("");
+    setCompatConfirmed(false);
     const recent = JSON.parse(
       localStorage.getItem("highparts_recent") || "[]",
     ) as string[];
@@ -273,6 +293,9 @@ export default function ProductPage() {
     product.stockQuantity > 0;
   const soldAsPair = clean(product.product).includes("DISCO DE FREIO");
   const applications = parseApplications(product.application);
+  const compatGroup = applications.find((group) => group.brand === compatBrand);
+  const compatModelData = compatGroup?.models.find((model) => model.name === compatModel);
+  const compatYears = compatModelData ? applicationYears(compatModelData.details) : [];
   const galleryImages = product.images?.length
     ? product.images
     : product.imageUrl
@@ -472,26 +495,78 @@ export default function ProductPage() {
               <p>Localize a marca e confirme modelo, motorização e ano.</p>
             </span>
           </div>
-          <div className="application-groups">
-            {applications.map((group, index) => (
-              <article key={`${group.brand}-${index}`}>
-                <header>
-                  <b>{group.brand}</b>
-                  <span>
-                    {group.models.length}{" "}
-                    {group.models.length === 1 ? "modelo" : "modelos"}
-                  </span>
-                </header>
-                <div>
-                  {group.models.map((model, item) => (
-                    <section key={`${model.name}-${item}`}>
-                      <b>{model.name}</b>
-                      {model.details && <span>{model.details}</span>}
-                    </section>
-                  ))}
-                </div>
-              </article>
-            ))}
+          <div className="compat-selector">
+            <div className="compat-selector-path">
+              {compatBrand && (
+                <button
+                  type="button"
+                  aria-label="Voltar uma etapa"
+                  onClick={() => {
+                    if (compatConfirmed) setCompatConfirmed(false);
+                    else if (compatYear) setCompatYear("");
+                    else if (compatModel) setCompatModel("");
+                    else setCompatBrand("");
+                  }}
+                >
+                  <ArrowLeft />
+                </button>
+              )}
+              <b>
+                {[compatBrand, compatModel, compatYear].filter(Boolean).join(" · ") ||
+                  "Selecione a marca"}
+              </b>
+            </div>
+
+            {compatConfirmed && compatModelData ? (
+              <div className="compat-confirmed">
+                <CheckCircle2 />
+                <span>
+                  Serve no <b>{compatBrand} {compatModel} {compatYear}</b>
+                  {compatModelData.details && <small>{compatModelData.details}</small>}
+                </span>
+              </div>
+            ) : (
+              <div className="compat-options">
+                {!compatBrand && applications.map((group) => (
+                  <button type="button" key={group.brand} onClick={() => setCompatBrand(group.brand)}>
+                    <span><small>MARCA</small><b>{group.brand}</b></span><ChevronRight />
+                  </button>
+                ))}
+                {compatBrand && !compatModel && compatGroup?.models.map((model) => (
+                  <button type="button" key={model.name} onClick={() => setCompatModel(model.name)}>
+                    <span><small>MODELO</small><b>{model.name}</b></span><ChevronRight />
+                  </button>
+                ))}
+                {compatModel && !compatYear && (compatYears.length ? compatYears : ["Todos os anos cadastrados"]).map((year) => (
+                  <button type="button" key={year} onClick={() => setCompatYear(year)}>
+                    <span><small>ANO</small><b>{year}</b></span><ChevronRight />
+                  </button>
+                ))}
+                {compatYear && (
+                  <button type="button" onClick={() => setCompatConfirmed(true)}>
+                    <span><small>APLICAÇÃO</small><b>{compatModelData?.details || "Aplicação cadastrada"}</b></span><ChevronRight />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {compatBrand && (
+              <button
+                type="button"
+                className="compat-clear"
+                onClick={() => {
+                  setCompatBrand("");
+                  setCompatModel("");
+                  setCompatYear("");
+                  setCompatConfirmed(false);
+                }}
+              >
+                Limpar veículo
+              </button>
+            )}
+            <a className="compat-missing" href="mailto:contato@highparts.com.br?subject=Veículo não encontrado">
+              <XCircle /> Não encontrou o seu veículo?
+            </a>
           </div>
         </div>
         <aside>
