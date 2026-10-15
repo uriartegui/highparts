@@ -48,6 +48,41 @@ type Vehicle = {
   engine: string | null;
 };
 
+const brandLogoSlugs: Record<string, string> = {
+  AUDI: "audi",
+  CHEVROLET: "chevrolet",
+  GM: "chevrolet",
+  FIAT: "fiat",
+  FORD: "ford",
+  RENAULT: "renault",
+  SEAT: "seat",
+  VOLKSWAGEN: "volkswagen",
+  VW: "volkswagen",
+};
+
+function BrandMark({ brand }: { brand: string }) {
+  const normalizedBrand = clean(brand);
+  const slug = brandLogoSlugs[normalizedBrand];
+  const initials = normalizedBrand
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .slice(0, 2);
+
+  return (
+    <span className="brand-mark" aria-hidden="true">
+      <span>{initials}</span>
+      {slug && (
+        <img
+          src={`https://cdn.simpleicons.org/${slug}/20242a`}
+          alt=""
+          onError={(event) => { event.currentTarget.hidden = true; }}
+        />
+      )}
+    </span>
+  );
+}
+
 function parseApplications(value: string): ApplicationGroup[] {
   return value
     .split(/(?=\[[^\]]+\])/)
@@ -563,7 +598,11 @@ export default function ProductPage() {
                     setCompatYear("");
                     setCompatVariant("");
                   }}>
-                    <span><small>MARCA</small><b>{group.brand}</b></span><ChevronRight />
+                    <span className="brand-option">
+                      <BrandMark brand={group.brand} />
+                      <span><small>MARCA</small><b>{group.brand}</b></span>
+                    </span>
+                    <ChevronRight />
                   </button>
                 ))}
                 {compatBrand && !compatModel && compatGroup?.models.map((model) => (
