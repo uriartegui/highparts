@@ -1,6 +1,7 @@
 "use client";
-import { LoaderCircle, Truck } from "lucide-react";
+import { ChevronDown, LoaderCircle, Truck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { cheapestAndFastest, featuredOptions } from "./shipping-options";
 
 type Option = { id: string; carrier: string; service: string; priceCents: number; deliveryDays: number; logo: string | null };
 const CEP_KEY = "highparts_cep";
@@ -18,6 +19,7 @@ export default function ShippingEstimator({ items, title = "Calcular frete e pra
   const [options, setOptions] = useState<Option[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const itemsKey = JSON.stringify(items);
 
   const calculate = useCallback(async (value: string) => {
@@ -42,6 +44,7 @@ export default function ShippingEstimator({ items, title = "Calcular frete e pra
         return;
       }
       setOptions(data.options);
+      setExpanded(false);
       try { localStorage.setItem(CEP_KEY, digits); } catch {}
     } catch {
       setOptions([]);
@@ -61,8 +64,10 @@ export default function ShippingEstimator({ items, title = "Calcular frete e pra
     }
   }, [calculate]);
 
-  const cheapest = options[0]?.id;
-  const fastest = options.length > 1 ? [...options].sort((a, b) => a.deliveryDays - b.deliveryDays || a.priceCents - b.priceCents)[0].id : "";
+  const { cheapest, fastest } = cheapestAndFastest(options);
+  const featured = featuredOptions(options);
+  const canExpand = options.length > featured.length;
+  const visible = expanded ? options : featured;
 
   return (
     <div className="hp-shipping-estimator">
@@ -78,14 +83,14 @@ export default function ShippingEstimator({ items, title = "Calcular frete e pra
       {error && <p className="hp-shipping-error" role="alert">{error}</p>}
       {options.length > 0 && (
         <ul className="hp-shipping-list" aria-live="polite">
-          {options.map((option) => (
+          {visible.map((option) => (
             <li key={option.id}>
               {option.logo ? <img src={option.logo} alt="" loading="lazy" onError={(event) => { event.currentTarget.style.visibility = "hidden"; }} /> : <span className="hp-shipping-logo" />}
               <span>
                 <b>
                   {option.carrier} · {option.service}
                   {option.id === cheapest && <em className="tag cheap">Mais barato</em>}
-                  {option.id === fastest && option.id !== cheapest && <em className="tag fast">Mais rápido</em>}
+                  {option.id === fastest && <em className="tag fast">Mais rápido</em>}
                 </b>
                 <small>Até {option.deliveryDays} {option.deliveryDays === 1 ? "dia útil" : "dias úteis"} após a confirmação do pagamento</small>
               </span>
@@ -93,6 +98,12 @@ export default function ShippingEstimator({ items, title = "Calcular frete e pra
             </li>
           ))}
         </ul>
+      )}
+      {canExpand && (
+        <button type="button" className="hp-shipping-more" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
+          {expanded ? "Mostrar menos" : `Ver todas as opções (${options.length})`}
+          <ChevronDown className={expanded ? "flip" : ""} />
+        </button>
       )}
     </div>
   );
